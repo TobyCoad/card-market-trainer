@@ -1,9 +1,9 @@
 /* Offline cache — stale-while-revalidate: serves from cache instantly, then
  * refreshes in the background. Bump CACHE together with version.json + APP_VERSION. */
-const CACHE = 'cmt-v1';
+const CACHE = 'cmt-v2';
 const ASSETS = [
   './', './index.html', './style.css',
-  './js/storage.js', './js/game.js', './js/stats.js', './js/app.js',
+  './js/storage.js', './js/game.js', './js/stats.js', './js/ready.js', './js/app.js',
   './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];

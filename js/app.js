@@ -1,8 +1,8 @@
 /* App shell — screens, settings, the round state machine, keypad, SW updates. */
 (function () {
   const el = id => document.getElementById(id);
-  const screens = ['home', 'game', 'results', 'stats', 'learn'];
-  const APP_VERSION = 1;
+  const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
+  const APP_VERSION = 2;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, phase = null, quoteShownAt = 0, timerHandle = null, flashHandle = null;
@@ -14,9 +14,10 @@
   function showScreen(name) {
     for (const s of screens) el('screen-' + s).classList.toggle('active', s === name);
     el('tabbar').classList.toggle('hidden', name === 'game');
-    const tab = name === 'stats' ? 'stats' : name === 'learn' ? 'learn' : 'home';
+    const tab = name === 'stats' ? 'stats' : name === 'learn' ? 'learn' : name === 'ready' ? 'ready' : 'home';
     document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
     if (name === 'stats') Stats.render(statWindow);
+    if (name === 'ready') Ready.render();
     if (name === 'home') refreshHome();
     maybeShowUpdateBanner();
     window.scrollTo(0, 0);
@@ -56,6 +57,10 @@
     const r = settings.rounds >= maxRounds() ? maxRounds() : settings.rounds;
     el('start-desc').textContent = settings.cards + ' cards · ' + r + ' rounds · ace = ' + (settings.aceHigh ? 14 : 1) + ' · €' + settings.bankroll + (settings.timerSec ? ' · ' + settings.timerSec + 's timer' : '');
     const games = Store.loadGames();
+    const R = Ready.evaluate();
+    const badge = el('ready-badge');
+    badge.className = 'ready-badge ' + (R.enoughData ? R.cls : '');
+    badge.textContent = R.enoughData ? R.verdict + ' · ' + Math.round(R.score * 100) + '%' : 'readiness: ' + R.roundsSeen + '/30 rounds';
     if (!games.length) { el('best-line').textContent = 'No games yet.'; return; }
     const last = games[games.length - 1];
     const best = Math.max.apply(null, games.map(g => g.pnl));

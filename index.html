@@ -7,9 +7,9 @@
   <meta name="description" content="The interview card-sum market-making game: trade the quote, size your edge, state your own P&L from memory">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="CardMarket">
-  <meta name="theme-color" content="#0f1117">
+  <meta name="theme-color" content="#f4efe6">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
@@ -19,8 +19,9 @@
   <!-- ============ HOME ============ -->
   <main id="screen-home" class="screen active">
     <header class="home-header">
-      <h1>Card Market Trainer</h1>
-      <p class="subtitle">the interview card-sum game &middot; all data stays on this device</p>
+      <div><h1>Card Market</h1>
+      <p class="subtitle">the interview card-sum game &middot; all data stays on this device</p></div>
+      <span class="ready-badge" id="ready-badge">readiness: play to unlock</span>
     </header>
 
     <button class="start-btn" id="btn-start">
@@ -91,6 +92,13 @@
     <div id="stats-body"></div>
   </main>
 
+  <!-- ============ READY ============ -->
+  <main id="screen-ready" class="screen">
+    <h1>Ready?</h1>
+    <p class="subtitle">benchmark of your recent play against an interview standard</p>
+    <div id="ready-body"></div>
+  </main>
+
   <!-- ============ LEARN ============ -->
   <main id="screen-learn" class="screen learn">
     <h1>The game</h1>
@@ -130,12 +138,14 @@
   <nav class="tabbar" id="tabbar">
     <button data-tab="home" class="on"><span class="tab-icon">&#9654;</span>Play</button>
     <button data-tab="stats"><span class="tab-icon">&#9632;</span>Stats</button>
+    <button data-tab="ready"><span class="tab-icon">&#10003;</span>Ready?</button>
     <button data-tab="learn"><span class="tab-icon">&#9679;</span>Learn</button>
   </nav>
 
   <script src="./js/storage.js"></script>
   <script src="./js/game.js"></script>
   <script src="./js/stats.js"></script>
+  <script src="./js/ready.js"></script>
   <script src="./js/app.js"></script>
 </body>
 </html>

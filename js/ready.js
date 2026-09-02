@@ -63,7 +63,7 @@ const Ready = (function () {
 
     const noted = games.filter(g => g.notedRounds > 0);
     const noteAcc = mean(noted.map(g => g.notesAccurate));
-    add('running', 'Running total kept accurately', 'Every checkpoint you wrote down matched the real bankroll. Target 95%+ — an error early poisons every round after it.',
+    add('running', 'Running total kept accurately', 'Checkpoints you wrote down that were inside the accepted band. Target 95%+ — an error early poisons every round after it.',
         noteAcc, noted.length ? pct(noteAcc) + ' of checkpoints over ' + noted.length + ' hands' : 'scratchpad off',
         noted.length >= 4 ? noteAcc >= 0.95 : null, 3);
 

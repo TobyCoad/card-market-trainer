@@ -23,7 +23,8 @@ when the win is certain — so **full Kelly here can never bust you**; and you g
 By default the **bankroll is hidden during play** and you must state your final number from
 memory at the end — that is the part an interviewer actually asks for. The app then grades:
 
-- final P&L accuracy (exact, or within a tolerance you set)
+- final P&L accuracy, accepted within a band you set (10% by default — you are meant to
+  be rounding as you go, not carrying cents)
 - the **running P&L scratchpad**: a box on the game screen for your own total, checked
   against the real bankroll at every bet, so the results screen names the exact round
   where you first came off
@@ -39,7 +40,7 @@ the counts and the Kelly stake.
 
 **Interview mode** is one tap on the home screen and sets the lot: bankroll hidden, hints off,
 and three clocks — 10 seconds a decision, 5 minutes for the hand, 15 seconds to state your
-final P&L. Run out of hand clock and you are stopped mid-deck and asked for your number
+final P&L, accepted within 10%. Run out of hand clock and you are stopped mid-deck and asked for your number
 anyway. All three run off a wall-clock deadline, so a backgrounded tab does not pause them.
 
 The **Ready?** tab benchmarks recent hands against a prep standard: stating P&L correctly,

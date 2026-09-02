@@ -2,7 +2,7 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 5;
+  const APP_VERSION = 6;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, quoteShownAt = 0, timerHandle = null, statWindow = 0;
@@ -13,6 +13,7 @@
   const fmt = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString();
   const pct = f => Math.round(f * 100) + '%';
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const band = tol => tol ? 'within the ' + Math.round(tol * 100) + '% band' : 'exact';
 
   /* ---------- screens ---------- */
   function showScreen(name) {
@@ -290,15 +291,18 @@
         money(sum.bankrollEnd) + '. In the room that reads as having lost track.</p></div>'
       : sum.pnlCorrect
       ? '<div class="verdict ok"><div class="big">P&L right</div><p>You said ' + money(sum.statedFinal) + ' — actual ' +
-        money(sum.bankrollEnd) + took + (sum.pnlTimedOut ? ' (on the buzzer)' : '') + '</p></div>'
+        money(sum.bankrollEnd) + ', out by ' + Math.round(sum.pnlRelErr * 100) + '% ' + band(sum.settings.pnlTolerance) +
+        took + (sum.pnlTimedOut ? ' (on the buzzer)' : '') + '</p></div>'
       : '<div class="verdict no"><div class="big">P&L wrong</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) +
-        ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%)' + took + '</p></div>';
+        ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%, ' +
+        (sum.settings.pnlTolerance ? 'outside the ' + Math.round(sum.settings.pnlTolerance * 100) + '% band' : 'not exact') + ')' + took + '</p></div>';
     const noteRow = !sum.notedRounds ? ''
       : sum.noteFirstDrift
       ? '<p class="hint warn-hint">Your running total was right up to bet ' + (sum.noteFirstDrift - 1) +
         ', then went out by ' + money(sum.noteFirstDriftBy) + ' at bet ' + sum.noteFirstDrift +
-        '. Everything after that inherits the same error — the round log below shows what you wrote against what was true.</p>'
-      : '<p class="hint">Running total correct at all ' + sum.notedRounds + ' checkpoints.</p>';
+        ' — past the ' + band(sum.settings.pnlTolerance) +
+        '. Everything after that inherits the same error, so the round log below shows what you wrote against what was true.</p>'
+      : '<p class="hint">Running total ' + band(sum.settings.pnlTolerance) + ' at all ' + sum.notedRounds + ' checkpoints.</p>';
     const clockRow = sum.clockExpired
       ? '<p class="hint warn-hint">Hand clock ran out with ' + (sum.roundsAvailable - sum.rounds) + ' of ' +
         sum.roundsAvailable + ' bets unplayed. Sizing takes seconds once you trust |h−l|/n — the time goes on second-guessing.</p>'
@@ -330,7 +334,7 @@
         '<td>' + Math.round(r.bankrollAfter) + '</td>' +
         (sum.notedRounds
           ? '<td>' + Math.round(r.bankrollBefore) + '</td>' +
-            '<td class="' + (r.noteErr == null ? '' : (r.noteErr <= 0.5 ? 'pos' : 'neg')) + '">' +
+            '<td class="' + (r.noteOk == null ? '' : (r.noteOk ? 'pos' : 'neg')) + '">' +
             (r.note == null ? '—' : esc(r.note)) + '</td>'
           : '') +
         '</tr>').join('') +

@@ -33,7 +33,7 @@
     <section class="settings-panel">
       <button class="preset-btn" id="btn-interview">
         <span class="preset-title">Interview mode</span>
-        <span class="preset-desc">Bankroll hidden, no hints, 10s a decision, 5 min for the hand, 15s to state your P&amp;L</span>
+        <span class="preset-desc">Bankroll hidden, no hints, 10s a decision, 5 min for the hand, 15s to state your P&amp;L, 10% band</span>
       </button>
 
       <h2>Game</h2>
@@ -54,7 +54,7 @@
 
       <h2>Grading</h2>
       <div class="setting-row"><label>Final P&amp;L accepted within</label>
-        <div class="seg" data-key="pnlTolerance"><button data-val="0">exact</button><button data-val="0.02">2%</button><button data-val="0.1">10%</button></div></div>
+        <div class="seg" data-key="pnlTolerance"><button data-val="0">exact</button><button data-val="0.02">2%</button><button data-val="0.05">5%</button><button data-val="0.1">10%</button></div></div>
 
       <h2>Difficulty</h2>
       <label class="toggle-row"><span>Hide my bankroll during play <small>the whole point &mdash; you state the final number from memory</small></span><input type="checkbox" data-key="hideBankroll"></label>
@@ -144,7 +144,7 @@
       <h3>Doing it on a clock</h3>
       <p><b>Interview mode</b> hides your bankroll, turns the hints off and puts three clocks on you: 10 seconds a decision, 5 minutes for the hand, and 15 seconds to state your final P&amp;L. Run out of hand clock and you are stopped mid-deck and asked for your number anyway.</p>
       <p>The stake takes almost no thought once you trust <b>|h &minus; l| / n</b> &mdash; the time goes on second-guessing a count you already have. Keep the running bankroll updated <i>as each card turns</i>, not at the end: the P&amp;L question should be you reading out a number you are already holding, inside about 8 seconds. Reconstructing twelve rounds from memory under a clock is where candidates come apart.</p>
-      <p>The <b>running P&amp;L</b> box on the game screen is your paper in the room. Whatever is in it when you place each bet is checked against the real bankroll going into that round, so the results screen can tell you the exact bet where your total first came off &mdash; which is more use than the final gap, since every round after it inherits the same error.</p>
+      <p>The <b>running P&amp;L</b> box on the game screen is your paper in the room. Whatever is in it when you place each bet is checked against the real bankroll going into that round, to the same tolerance as the final answer, so the results screen can tell you the exact bet where your total first came off &mdash; which is more use than the final gap, since every round after it inherits the same error.</p>
     </section>
     <section class="card">
       <h3>Ask before you start</h3>

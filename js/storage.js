@@ -15,18 +15,31 @@ const Store = (function () {
     timerSec: 0,            // per-decision clock, 0 = off
     handSec: 0,             // clock for the whole hand, 0 = off
     pnlSec: 0,              // clock to state your final P&L, 0 = off
-    pnlTolerance: 0.02,     // final P&L accepted within this fraction (0 = exact)
+    pnlTolerance: 0.10,     // final P&L accepted within this fraction (0 = exact)
   };
+  /* sv is deliberately NOT in DEFAULTS: merging it in would make an unmigrated saved
+   * settings object look already-migrated and the migration would silently no-op. */
 
   /* One tap for the real thing: bankroll hidden, no hints, everything on a clock. */
   const INTERVIEW = {
     hideBankroll: true, hideSeen: false, showKelly: false, askProb: false,
-    timerSec: 10, handSec: 300, pnlSec: 15, pnlTolerance: 0.02,
+    timerSec: 10, handSec: 300, pnlSec: 15, pnlTolerance: 0.10,
   };
 
+  /* Settings already saved on a device do not pick up a change of default, so a deliberate
+   * change to what counts as correct needs a one-time bump. sv 2: final P&L moved from a 2%
+   * band to 10% — you are meant to be rounding as you go, not carrying cents. */
+  const SETTINGS_VERSION = 2;
+
   function loadSettings() {
-    try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY_SETTINGS) || '{}')); }
-    catch (e) { return Object.assign({}, DEFAULTS); }
+    let raw;
+    try { raw = JSON.parse(localStorage.getItem(KEY_SETTINGS) || '{}') || {}; }
+    catch (e) { raw = {}; }
+    const stored = raw.sv | 0;                       // absent on anything saved before sv existed
+    const s = Object.assign({}, DEFAULTS, raw);
+    if (stored < 2) s.pnlTolerance = 0.10;
+    if (stored !== SETTINGS_VERSION) { s.sv = SETTINGS_VERSION; saveSettings(s); }
+    return s;
   }
   function saveSettings(s) { localStorage.setItem(KEY_SETTINGS, JSON.stringify(s)); }
 

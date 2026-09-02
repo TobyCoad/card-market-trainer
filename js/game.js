@@ -85,6 +85,15 @@ const Game = (function () {
     return st.current;
   }
 
+  /* One rule for "close enough", used for both the final answer and every scratchpad
+   * checkpoint. With a tolerance band you are expected to be rounding as you go, so holding
+   * the running total to the cent would contradict the final grade. */
+  function within(stated, actual, tol) {
+    const err = Math.abs(stated - actual);
+    if (!tol) return err < 0.5;
+    return actual > 0 ? err / actual <= tol : err < 0.5;
+  }
+
   /* Last number written in the scratchpad, ignoring €, commas and any words around it. */
   function parseNote(s) {
     if (s == null) return null;
@@ -106,6 +115,7 @@ const Game = (function () {
     c.timedOut = !!timedOut;
     c.bankrollBefore = st.bankroll;
     c.noteErr = c.noteNum == null ? null : Math.abs(c.noteNum - st.bankroll);
+    c.noteOk = c.noteNum == null ? null : within(c.noteNum, st.bankroll, st.settings.pnlTolerance);
 
     const next = st.deck[st.pos + 1];
     c.next = next;
@@ -160,8 +170,7 @@ const Game = (function () {
     const err = Math.abs(stated - st.bankroll);
     st.pnlAbsErr = err;
     st.pnlRelErr = st.bankroll > 0 ? err / st.bankroll : (err > 0 ? 1 : 0);
-    const tol = st.settings.pnlTolerance;          // 0 = exact, else fractional band
-    st.pnlCorrect = tol === 0 ? err < 0.5 : st.pnlRelErr <= tol;
+    st.pnlCorrect = within(stated, st.bankroll, st.settings.pnlTolerance);
     return st.pnlCorrect;
   }
 
@@ -173,8 +182,8 @@ const Game = (function () {
     const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
     /* Where the running total first came off the rails — more useful than the final gap,
      * because everything after it inherits the same error. */
-    const noted = L.filter(r => r.noteErr != null);
-    const drift = noted.find(r => r.noteErr > 0.5);
+    const noted = L.filter(r => r.noteOk != null);
+    const drift = noted.find(r => !r.noteOk);
     return {
       id: st.id, ts: st.ts, settings: st.settings, rounds: n,
       start: st.start, bankrollEnd: st.bankroll, pnl: st.bankroll - st.start,
@@ -183,7 +192,7 @@ const Game = (function () {
       pnlRelErr: st.pnlRelErr, pnlAbsErr: st.pnlAbsErr,
       pnlMs: st.pnlMs, pnlTimedOut: !!st.pnlTimedOut,
       notedRounds: noted.length,
-      notesAccurate: noted.length ? noted.filter(r => r.noteErr <= 0.5).length / noted.length : null,
+      notesAccurate: noted.length ? noted.filter(r => r.noteOk).length / noted.length : null,
       noteFirstDrift: drift ? drift.round : null,
       noteFirstDriftBy: drift ? drift.noteErr : null,
       handMs: st.handMs, clockExpired: !!st.clockExpired,
@@ -207,7 +216,8 @@ const Game = (function () {
         wasCertain: r.wasCertain, capturedCertain: r.capturedCertain,
         decisionMs: r.decisionMs, timedOut: r.timedOut,
         bankrollBefore: +r.bankrollBefore.toFixed(2),
-        note: r.note, noteNum: r.noteNum, noteErr: r.noteErr == null ? null : +r.noteErr.toFixed(2),
+        note: r.note, noteNum: r.noteNum, noteOk: r.noteOk,
+        noteErr: r.noteErr == null ? null : +r.noteErr.toFixed(2),
       })),
     };
   }

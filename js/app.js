@@ -2,7 +2,7 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 4;
+  const APP_VERSION = 5;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, quoteShownAt = 0, timerHandle = null, statWindow = 0;
@@ -12,6 +12,7 @@
   const money = n => '€' + (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
   const fmt = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString();
   const pct = f => Math.round(f * 100) + '%';
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   /* ---------- screens ---------- */
   function showScreen(name) {
@@ -161,6 +162,8 @@
   function startGame() {
     st = Game.newGame(settings);
     showScreen('game');
+    el('g-scratch').hidden = !settings.scratchpad;
+    el('g-note').value = '';                  // the scratchpad survives the whole hand, not the round
     startHandClock();
     nextRound();
   }
@@ -224,7 +227,7 @@
   function commit(side, frac, timedOut) {
     stopTimer();
     const ms = Math.round(performance.now() - quoteShownAt);
-    const c = Game.bet(st, side, frac, ms, timedOut);
+    const c = Game.bet(st, side, frac, ms, timedOut, settings.scratchpad ? el('g-note').value : null);
     c.probEst = probEst;
     phaseReveal(c);
   }
@@ -290,6 +293,12 @@
         money(sum.bankrollEnd) + took + (sum.pnlTimedOut ? ' (on the buzzer)' : '') + '</p></div>'
       : '<div class="verdict no"><div class="big">P&L wrong</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) +
         ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%)' + took + '</p></div>';
+    const noteRow = !sum.notedRounds ? ''
+      : sum.noteFirstDrift
+      ? '<p class="hint warn-hint">Your running total was right up to bet ' + (sum.noteFirstDrift - 1) +
+        ', then went out by ' + money(sum.noteFirstDriftBy) + ' at bet ' + sum.noteFirstDrift +
+        '. Everything after that inherits the same error — the round log below shows what you wrote against what was true.</p>'
+      : '<p class="hint">Running total correct at all ' + sum.notedRounds + ' checkpoints.</p>';
     const clockRow = sum.clockExpired
       ? '<p class="hint warn-hint">Hand clock ran out with ' + (sum.roundsAvailable - sum.rounds) + ' of ' +
         sum.roundsAvailable + ' bets unplayed. Sizing takes seconds once you trust |h−l|/n — the time goes on second-guessing.</p>'
@@ -308,15 +317,23 @@
       (sum.passCount ? '<p class="hint">Zero-edge rounds: ' + sum.passCount + ', passed correctly ' + Math.round(sum.passDiscipline * 100) + '%.</p>' : '') +
       (sum.timeouts ? '<p class="hint warn-hint">' + sum.timeouts + ' decision' + (sum.timeouts > 1 ? 's' : '') +
         ' timed out — a timeout is scored as a pass, and in the room it is a freeze.</p>' : '') +
+      noteRow +
       clockRow +
       '</section>' +
       '<section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl">' +
-      '<tr><th>#</th><th>card</th><th>h/l</th><th>you</th><th>Kelly</th><th>next</th><th>P&L</th><th>bank</th></tr>' +
+      '<tr><th>#</th><th>card</th><th>h/l</th><th>you</th><th>Kelly</th><th>next</th><th>P&L</th><th>bank</th>' +
+      (sum.notedRounds ? '<th>had</th><th>you said</th>' : '') + '</tr>' +
       sum.log.map(r => '<tr><td>' + r.round + '</td><td>' + r.showing + '</td><td>' + r.h + '/' + r.l + '</td>' +
         '<td class="' + (r.sideCorrect ? 'pos' : 'neg') + '">' + (r.side === 'pass' ? 'pass' : r.side.slice(0, 2) + ' ' + Math.round(r.frac * 100) + '%') + '</td>' +
         '<td>' + (r.kSide ? r.kSide.slice(0, 2) + ' ' + Math.round(r.kFrac * 100) + '%' : 'pass') + '</td>' +
         '<td>' + r.next + '</td><td class="' + (r.pnl >= 0 ? 'pos' : 'neg') + '">' + fmt(r.pnl) + '</td>' +
-        '<td>' + Math.round(r.bankrollAfter) + '</td></tr>').join('') +
+        '<td>' + Math.round(r.bankrollAfter) + '</td>' +
+        (sum.notedRounds
+          ? '<td>' + Math.round(r.bankrollBefore) + '</td>' +
+            '<td class="' + (r.noteErr == null ? '' : (r.noteErr <= 0.5 ? 'pos' : 'neg')) + '">' +
+            (r.note == null ? '—' : esc(r.note)) + '</td>'
+          : '') +
+        '</tr>').join('') +
       '</table></div></section>';
     showScreen('results');
   }

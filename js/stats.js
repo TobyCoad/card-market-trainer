@@ -39,6 +39,8 @@ const Stats = (function () {
     const zeroEdge = rows.filter(r => r.kSide === null);
     const bigEdge = bets.filter(r => r.kFrac >= 0.5), smallEdge = bets.filter(r => r.kFrac > 0 && r.kFrac < 0.25);
     const pnlClocked = games.filter(g => g.pnlMs != null), handClocked = games.filter(g => g.settings.handSec > 0);
+    const noted = games.filter(g => g.notedRounds > 0);
+    const drifts = noted.filter(g => g.noteFirstDrift).map(g => g.noteFirstDrift);
 
     body.innerHTML =
       '<section class="card"><h3>Headline</h3><div class="kpis">' +
@@ -56,6 +58,9 @@ const Stats = (function () {
       '<section class="card"><h3>Final P&amp;L accuracy</h3>' +
         bar('stated correctly', mean(games.map(g => g.pnlCorrect ? 1 : 0)), pct(mean(games.map(g => g.pnlCorrect ? 1 : 0)))) +
         bar('typical error', Math.min(1, (mean(games.map(g => g.pnlRelErr)) || 0) * 5), pct(mean(games.map(g => g.pnlRelErr))) + ' off') +
+        (noted.length ? bar('running total checkpoints', mean(noted.map(g => g.notesAccurate)),
+            pct(mean(noted.map(g => g.notesAccurate))) + ' right over ' + noted.length + ' hands') : '') +
+        (drifts.length ? '<p class="hint">Typical first slip: bet ' + Math.round(mean(drifts)) + ' of 12.</p>' : '') +
         '<p class="hint">This is the one the interviewer actually asks you for. Track the running total after every card, not at the end.</p></section>' +
 
       '<section class="card"><h3>Picking the side</h3>' +

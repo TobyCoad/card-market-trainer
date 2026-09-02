@@ -61,6 +61,12 @@ const Ready = (function () {
     add('timeouts', 'No timeouts', 'A timeout is a frozen candidate. Target zero.', to, to + ' timeouts',
         timed.length >= 20 ? to === 0 : null, 1);
 
+    const noted = games.filter(g => g.notedRounds > 0);
+    const noteAcc = mean(noted.map(g => g.notesAccurate));
+    add('running', 'Running total kept accurately', 'Every checkpoint you wrote down matched the real bankroll. Target 95%+ — an error early poisons every round after it.',
+        noteAcc, noted.length ? pct(noteAcc) + ' of checkpoints over ' + noted.length + ' hands' : 'scratchpad off',
+        noted.length >= 4 ? noteAcc >= 0.95 : null, 3);
+
     const pnlSpeed = mean(pnlClocked.map(g => g.pnlMs));
     add('pnlspeed', 'P&L stated fast', 'You should have the running total already, not be reconstructing it. Target under 8 seconds.',
         pnlSpeed, pnlClocked.length ? num(pnlSpeed / 1000, 1) + 's over ' + pnlClocked.length + ' hands' : 'no clocked answers',

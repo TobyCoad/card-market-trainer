@@ -24,6 +24,9 @@ By default the **bankroll is hidden during play** and you must state your final 
 memory at the end — that is the part an interviewer actually asks for. The app then grades:
 
 - final P&L accuracy (exact, or within a tolerance you set)
+- the **running P&L scratchpad**: a box on the game screen for your own total, checked
+  against the real bankroll at every bet, so the results screen names the exact round
+  where you first came off
 - picking the right side, broken out by how big the edge was
 - stake versus the Kelly fraction, separately on big and small edges
 - taking the certain wins in full, and passing at zero edge

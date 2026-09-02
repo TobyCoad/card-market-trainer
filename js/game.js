@@ -85,15 +85,27 @@ const Game = (function () {
     return st.current;
   }
 
-  /* side: 'higher' | 'lower' | 'pass'; frac: 0..1 of current bankroll */
-  function bet(st, side, frac, decisionMs, timedOut) {
+  /* Last number written in the scratchpad, ignoring €, commas and any words around it. */
+  function parseNote(s) {
+    if (s == null) return null;
+    const m = String(s).replace(/[€,\s]/g, '').match(/-?\d+(?:\.\d+)?/g);
+    return m ? parseFloat(m[m.length - 1]) : null;
+  }
+
+  /* side: 'higher' | 'lower' | 'pass'; frac: 0..1 of current bankroll.
+   * note is the scratchpad as it read at the moment of the bet, so it should equal the
+   * bankroll going *into* this round — the card has not turned yet. */
+  function bet(st, side, frac, decisionMs, timedOut, note) {
     const c = st.current;
+    c.note = note == null || note === '' ? null : String(note).slice(0, 32);
+    c.noteNum = parseNote(note);
     c.side = side;
     c.frac = side === 'pass' ? 0 : frac;
     c.stake = st.bankroll * c.frac;
     c.decisionMs = decisionMs;
     c.timedOut = !!timedOut;
     c.bankrollBefore = st.bankroll;
+    c.noteErr = c.noteNum == null ? null : Math.abs(c.noteNum - st.bankroll);
 
     const next = st.deck[st.pos + 1];
     c.next = next;
@@ -159,6 +171,10 @@ const Game = (function () {
     const certain = L.filter(r => r.wasCertain);
     const passes = L.filter(r => r.shouldPass);
     const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    /* Where the running total first came off the rails — more useful than the final gap,
+     * because everything after it inherits the same error. */
+    const noted = L.filter(r => r.noteErr != null);
+    const drift = noted.find(r => r.noteErr > 0.5);
     return {
       id: st.id, ts: st.ts, settings: st.settings, rounds: n,
       start: st.start, bankrollEnd: st.bankroll, pnl: st.bankroll - st.start,
@@ -166,6 +182,10 @@ const Game = (function () {
       statedFinal: st.statedFinal, pnlCorrect: st.pnlCorrect,
       pnlRelErr: st.pnlRelErr, pnlAbsErr: st.pnlAbsErr,
       pnlMs: st.pnlMs, pnlTimedOut: !!st.pnlTimedOut,
+      notedRounds: noted.length,
+      notesAccurate: noted.length ? noted.filter(r => r.noteErr <= 0.5).length / noted.length : null,
+      noteFirstDrift: drift ? drift.round : null,
+      noteFirstDriftBy: drift ? drift.noteErr : null,
       handMs: st.handMs, clockExpired: !!st.clockExpired,
       roundsAvailable: st.rounds,
       sideAcc: n ? L.filter(r => r.sideCorrect).length / n : 0,
@@ -186,9 +206,11 @@ const Game = (function () {
         sideCorrect: r.sideCorrect, fracError: +r.fracError.toFixed(4),
         wasCertain: r.wasCertain, capturedCertain: r.capturedCertain,
         decisionMs: r.decisionMs, timedOut: r.timedOut,
+        bankrollBefore: +r.bankrollBefore.toFixed(2),
+        note: r.note, noteNum: r.noteNum, noteErr: r.noteErr == null ? null : +r.noteErr.toFixed(2),
       })),
     };
   }
 
-  return { newGame, deal, bet, endEarly, submitFinal, summary, counts, kelly };
+  return { newGame, deal, bet, endEarly, submitFinal, summary, counts, kelly, parseNote };
 })();

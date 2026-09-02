@@ -9,6 +9,7 @@ const Store = (function () {
     tieRule: 'push',        // only matters with the full deck
     hideBankroll: true,     // the point: carry your own P&L
     hideSeen: false,        // hide the cards already turned (memory mode)
+    scratchpad: true,       // a box to keep your running P&L in, like paper in the room
     showKelly: false,       // training wheels: show the counts and the Kelly stake
     askProb: false,         // ask for your probability before you size
     timerSec: 0,            // per-decision clock, 0 = off

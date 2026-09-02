@@ -9,14 +9,18 @@ const Ready = (function () {
   function evaluate() {
     const all = Store.loadGames();
     const games = all.slice(-GAMES_WINDOW);
-    const rows = games.flatMap(g => g.log);
+    const rows = games.flatMap(g => g.log.map(r => Object.assign({ gs: g.settings }, r)));
     const bets = rows.filter(r => r.side !== 'pass');
     const cert = rows.filter(r => r.wasCertain);
     const zero = rows.filter(r => r.kSide === null);
     const bigEdge = bets.filter(r => r.kFrac >= 0.5);
-    const timed = rows.filter(r => r.decisionMs != null && games.some(g => g.settings.timerSec > 0));
+    const timed = rows.filter(r => r.decisionMs != null && r.gs.timerSec > 0);
     const hidden = games.filter(g => g.settings.hideBankroll);
     const noWheels = games.filter(g => !g.settings.showKelly);
+    const handClocked = games.filter(g => g.settings.handSec > 0);
+    const pnlClocked = games.filter(g => g.settings.pnlSec > 0 && g.pnlMs != null);
+    const interview = games.filter(g => g.settings.hideBankroll && !g.settings.showKelly &&
+                                        g.settings.timerSec > 0 && g.settings.handSec > 0 && g.settings.pnlSec > 0);
 
     const C = [];
     const add = (key, name, why, val, text, pass, w) => C.push({ key, name, why, val, text, pass, weight: w });
@@ -57,10 +61,19 @@ const Ready = (function () {
     add('timeouts', 'No timeouts', 'A timeout is a frozen candidate. Target zero.', to, to + ' timeouts',
         timed.length >= 20 ? to === 0 : null, 1);
 
-    add('realism', 'Practised without training wheels', 'Hands with the bankroll hidden and the Kelly hint off. Target at least 4 of your recent hands.',
-        noWheels.filter(g => g.settings.hideBankroll).length,
-        noWheels.filter(g => g.settings.hideBankroll).length + '/' + games.length + ' hands',
-        games.length >= 4 ? noWheels.filter(g => g.settings.hideBankroll).length >= 4 : null, 1);
+    const pnlSpeed = mean(pnlClocked.map(g => g.pnlMs));
+    add('pnlspeed', 'P&L stated fast', 'You should have the running total already, not be reconstructing it. Target under 8 seconds.',
+        pnlSpeed, pnlClocked.length ? num(pnlSpeed / 1000, 1) + 's over ' + pnlClocked.length + ' hands' : 'no clocked answers',
+        pnlClocked.length >= 4 ? pnlSpeed <= 8000 : null, 2);
+
+    const finished = mean(handClocked.map(g => g.clockExpired ? 0 : 1));
+    add('handclock', 'Finished inside the hand clock', 'Getting cut off mid-deck means you are deliberating too long per card. Target 90%+.',
+        finished, handClocked.length ? pct(finished) + ' of ' + handClocked.length + ' clocked hands' : 'no clocked hands',
+        handClocked.length >= 4 ? finished >= 0.9 : null, 2);
+
+    add('realism', 'Practised under interview conditions', 'Bankroll hidden, no Kelly hint, all three clocks running. Target at least 4 of your recent hands.',
+        interview.length, interview.length + '/' + games.length + ' hands',
+        games.length >= 4 ? interview.length >= 4 : null, 1);
 
     const scored = C.filter(c => c.pass !== null);
     const wTot = scored.reduce((a, c) => a + c.weight, 0);
@@ -100,8 +113,8 @@ const Ready = (function () {
           '<div class="val">' + c.text + '<small>' + (c.pass === null ? 'more data' : 'weight ' + c.weight) + '</small></div></div>').join('') +
       '</section>' +
       '<section class="card"><h3>How to read this</h3><p class="hint">"Interview-ready" needs 85%+ of weighted criteria, none of the three core ones failing ' +
-        '(stating your P&amp;L, picking the right side, taking the certain wins), and at least 70% of criteria measurable — which means playing timed hands ' +
-        'with the bankroll hidden and the Kelly hint off. Thresholds are this app\'s prep standard, not IMC\'s rubric.</p></section>';
+        '(stating your P&amp;L, picking the right side, taking the certain wins), and at least 70% of criteria measurable — which means hands played in ' +
+        '<b>Interview mode</b>: bankroll hidden, Kelly hint off, all three clocks on. Thresholds are this app\'s prep standard, not IMC\'s rubric.</p></section>';
   }
   return { evaluate, render };
 })();

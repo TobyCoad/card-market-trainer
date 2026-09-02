@@ -38,6 +38,7 @@ const Stats = (function () {
     const certRows = rows.filter(r => r.wasCertain);
     const zeroEdge = rows.filter(r => r.kSide === null);
     const bigEdge = bets.filter(r => r.kFrac >= 0.5), smallEdge = bets.filter(r => r.kFrac > 0 && r.kFrac < 0.25);
+    const pnlClocked = games.filter(g => g.pnlMs != null), handClocked = games.filter(g => g.settings.handSec > 0);
 
     body.innerHTML =
       '<section class="card"><h3>Headline</h3><div class="kpis">' +
@@ -73,10 +74,16 @@ const Stats = (function () {
             num(mean(games.map(g => g.growthGiveUp)), 2) + ' doublings') +
         '<p class="hint">A certain win is a free doubling — missing one costs more than any sizing slip elsewhere.</p></section>' +
 
-      '<section class="card"><h3>Speed</h3>' +
+      '<section class="card"><h3>Under the clock</h3>' +
         bar('avg decision', Math.max(0, 1 - (mean(rows.filter(r => r.decisionMs != null).map(r => r.decisionMs)) || 0) / 30000),
             ms(mean(rows.filter(r => r.decisionMs != null).map(r => r.decisionMs)))) +
-        '<p class="hint">' + rows.filter(r => r.timedOut).length + ' timeouts across ' + rows.length + ' decisions.</p></section>' +
+        bar('time to state P&L', Math.max(0, 1 - (mean(pnlClocked.map(g => g.pnlMs)) || 0) / 20000),
+            pnlClocked.length ? ms(mean(pnlClocked.map(g => g.pnlMs))) : 'not clocked') +
+        bar('hands finished in time', handClocked.length ? mean(handClocked.map(g => g.clockExpired ? 0 : 1)) : 0,
+            handClocked.length ? pct(mean(handClocked.map(g => g.clockExpired ? 0 : 1))) + ' of ' + handClocked.length : 'not clocked') +
+        '<p class="hint">' + rows.filter(r => r.timedOut).length + ' timeouts across ' + rows.length + ' decisions' +
+        (handClocked.filter(g => g.clockExpired).length ? ', ' + handClocked.filter(g => g.clockExpired).length + ' hands cut off by the clock' : '') +
+        '. The P&amp;L answer is the one to get under 8s — you should be reading a number you already have.</p></section>' +
 
       '<section class="card"><h3>Recent hands</h3><table class="tbl">' +
         '<tr><th>when</th><th>final</th><th>P&amp;L said</th><th>side</th><th>size err</th><th>doublings</th></tr>' +

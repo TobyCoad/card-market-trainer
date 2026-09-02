@@ -31,6 +31,11 @@
     <p class="best-line" id="best-line"></p>
 
     <section class="settings-panel">
+      <button class="preset-btn" id="btn-interview">
+        <span class="preset-title">Interview mode</span>
+        <span class="preset-desc">Bankroll hidden, no hints, 10s a decision, 5 min for the hand, 15s to state your P&amp;L</span>
+      </button>
+
       <h2>Game</h2>
       <div class="setting-row"><label>Deck</label>
         <div class="seg" data-key="fullDeck"><button data-val="false">13 cards</button><button data-val="true">52 cards</button></div></div>
@@ -38,8 +43,16 @@
         <div class="seg" data-key="tieRule"><button data-val="push">push</button><button data-val="loss">a loss</button></div></div>
       <div class="setting-row"><label>Starting bankroll</label>
         <div class="seg" data-key="bankroll"><button data-val="1000">1000</button><button data-val="100">100</button></div></div>
-      <div class="setting-row"><label>Decision timer</label>
-        <div class="seg" data-key="timerSec"><button data-val="0">off</button><button data-val="15">15s</button><button data-val="30">30s</button></div></div>
+      <h2>Clocks</h2>
+      <div class="setting-row"><label>Per decision</label>
+        <div class="seg" data-key="timerSec"><button data-val="0">off</button><button data-val="10">10s</button><button data-val="15">15s</button><button data-val="30">30s</button></div></div>
+      <div class="setting-row"><label>Whole hand</label>
+        <div class="seg" data-key="handSec"><button data-val="0">off</button><button data-val="180">3 min</button><button data-val="300">5 min</button><button data-val="420">7 min</button></div></div>
+      <div class="setting-row"><label>To state your P&amp;L</label>
+        <div class="seg" data-key="pnlSec"><button data-val="0">off</button><button data-val="10">10s</button><button data-val="15">15s</button><button data-val="30">30s</button></div></div>
+      <p class="setting-note">When the hand clock runs out you are stopped where you are and asked for your number anyway &mdash; the same as being cut off in the room.</p>
+
+      <h2>Grading</h2>
       <div class="setting-row"><label>Final P&amp;L accepted within</label>
         <div class="seg" data-key="pnlTolerance"><button data-val="0">exact</button><button data-val="0.02">2%</button><button data-val="0.1">10%</button></div></div>
 
@@ -57,6 +70,7 @@
       <span id="g-round">Round 1 / 12</span>
       <span id="g-bank" class="bank">&euro;1000</span>
       <span id="g-timer" class="timer"></span>
+      <span id="g-hand" class="hand-clock"></span>
     </div>
     <div id="g-seen" class="seen-strip"></div>
     <div class="cards" id="g-cards"></div>
@@ -120,6 +134,11 @@
     <section class="card">
       <h3>The trap worth naming</h3>
       <p>Betting everything whenever you have any edge has a <i>higher</i> expected value (about &euro;213,000) but a <b>median of zero</b> &mdash; it busts 89% of the time. Maximising E[wealth] and E[log wealth] give completely different answers, and Kelly targets the growth rate that survives repetition. Flat-betting 25% every round is far worse than Kelly too, at a median around &euro;5,200.</p>
+    </section>
+    <section class="card">
+      <h3>Doing it on a clock</h3>
+      <p><b>Interview mode</b> hides your bankroll, turns the hints off and puts three clocks on you: 10 seconds a decision, 5 minutes for the hand, and 15 seconds to state your final P&amp;L. Run out of hand clock and you are stopped mid-deck and asked for your number anyway.</p>
+      <p>The stake takes almost no thought once you trust <b>|h &minus; l| / n</b> &mdash; the time goes on second-guessing a count you already have. Keep the running bankroll updated <i>as each card turns</i>, not at the end: the P&amp;L question should be you reading out a number you are already holding, inside about 8 seconds. Reconstructing twelve rounds from memory under a clock is where candidates come apart.</p>
     </section>
     <section class="card">
       <h3>Ask before you start</h3>

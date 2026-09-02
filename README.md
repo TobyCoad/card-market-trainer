@@ -34,6 +34,11 @@ Settings cover the 52-card deck (with ties as a push or a loss), hiding the card
 turned, being asked your probability before you size, and a training-wheels mode that shows
 the counts and the Kelly stake.
 
+**Interview mode** is one tap on the home screen and sets the lot: bankroll hidden, hints off,
+and three clocks — 10 seconds a decision, 5 minutes for the hand, 15 seconds to state your
+final P&L. Run out of hand clock and you are stopped mid-deck and asked for your number
+anyway. All three run off a wall-clock deadline, so a backgrounded tab does not pause them.
+
 The **Ready?** tab benchmarks recent hands against a prep standard: stating P&L correctly,
 near-perfect side selection and taking every certain win are the three core criteria.
 

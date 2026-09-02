@@ -37,7 +37,15 @@ const Game = (function () {
       bankroll: s.bankroll,
       start: s.bankroll,
       log: [], current: null, over: false, rounds: n - 1,
+      startedAt: performance.now(), clockExpired: false,
     };
+  }
+
+  /* The hand clock ran out. The interviewer stops you where you are and asks for your number. */
+  function endEarly(st) {
+    st.over = true;
+    st.clockExpired = true;
+    return st;
   }
 
   /* Counts of unseen cards relative to the card showing. */
@@ -124,7 +132,18 @@ const Game = (function () {
     return c;
   }
 
-  function submitFinal(st, stated) {
+  /* stated === null means the clock beat you to it, which grades as no answer at all. */
+  function submitFinal(st, stated, pnlMs, timedOut) {
+    st.pnlMs = pnlMs == null ? null : Math.round(pnlMs);
+    st.pnlTimedOut = !!timedOut;
+    st.handMs = Math.round(performance.now() - st.startedAt);
+    if (stated == null) {
+      st.statedFinal = null;
+      st.pnlAbsErr = Math.abs(st.bankroll);
+      st.pnlRelErr = 1;
+      st.pnlCorrect = false;
+      return false;
+    }
     st.statedFinal = stated;
     const err = Math.abs(stated - st.bankroll);
     st.pnlAbsErr = err;
@@ -146,6 +165,9 @@ const Game = (function () {
       growth: st.start > 0 && st.bankroll > 0 ? Math.log2(st.bankroll / st.start) : null,
       statedFinal: st.statedFinal, pnlCorrect: st.pnlCorrect,
       pnlRelErr: st.pnlRelErr, pnlAbsErr: st.pnlAbsErr,
+      pnlMs: st.pnlMs, pnlTimedOut: !!st.pnlTimedOut,
+      handMs: st.handMs, clockExpired: !!st.clockExpired,
+      roundsAvailable: st.rounds,
       sideAcc: n ? L.filter(r => r.sideCorrect).length / n : 0,
       meanFracErr: mean(L.filter(r => r.k.side).map(r => r.fracError)),
       certainCount: certain.length,
@@ -168,5 +190,5 @@ const Game = (function () {
     };
   }
 
-  return { newGame, deal, bet, submitFinal, summary, counts, kelly };
+  return { newGame, deal, bet, endEarly, submitFinal, summary, counts, kelly };
 })();

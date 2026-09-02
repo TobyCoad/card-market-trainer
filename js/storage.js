@@ -11,8 +11,16 @@ const Store = (function () {
     hideSeen: false,        // hide the cards already turned (memory mode)
     showKelly: false,       // training wheels: show the counts and the Kelly stake
     askProb: false,         // ask for your probability before you size
-    timerSec: 0,            // decision clock, 0 = off
+    timerSec: 0,            // per-decision clock, 0 = off
+    handSec: 0,             // clock for the whole hand, 0 = off
+    pnlSec: 0,              // clock to state your final P&L, 0 = off
     pnlTolerance: 0.02,     // final P&L accepted within this fraction (0 = exact)
+  };
+
+  /* One tap for the real thing: bankroll hidden, no hints, everything on a clock. */
+  const INTERVIEW = {
+    hideBankroll: true, hideSeen: false, showKelly: false, askProb: false,
+    timerSec: 10, handSec: 300, pnlSec: 15, pnlTolerance: 0.02,
   };
 
   function loadSettings() {
@@ -46,5 +54,8 @@ const Store = (function () {
   }
   function reset() { localStorage.removeItem(KEY_GAMES); }
 
-  return { DEFAULTS, loadSettings, saveSettings, loadGames, saveGame, exportJSON, importJSON, reset };
+  function isInterviewMode(s) { return Object.keys(INTERVIEW).every(k => s[k] === INTERVIEW[k]); }
+
+  return { DEFAULTS, INTERVIEW, isInterviewMode, loadSettings, saveSettings, loadGames, saveGame,
+           exportJSON, importJSON, reset };
 })();

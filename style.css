@@ -178,3 +178,34 @@ h3 { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-bottom
 .hint-inline { font-size: 12px; color: var(--felt-deep); background: #e8f1ea; border: 1px solid #bfe0cb;
                border-radius: var(--r); padding: 6px 9px; margin-bottom: 8px; text-align: center; }
 .size-grid { grid-template-columns: repeat(4, 1fr); }
+
+/* ---- interview clocks ---- */
+.preset-btn {
+  display: block; width: 100%; text-align: left; margin: 0 0 18px;
+  padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--white); color: var(--ink); font: inherit; cursor: pointer;
+}
+.preset-btn .preset-title { display: block; font-weight: 700; letter-spacing: .02em; }
+.preset-btn .preset-desc { display: block; margin-top: 3px; font-size: 12px; color: var(--ink-dim); line-height: 1.45; }
+.preset-btn.on { background: var(--felt); border-color: var(--felt); }
+.preset-btn.on .preset-title { color: #fff; }
+.preset-btn.on .preset-desc { color: rgba(255, 255, 255, .78); }
+.preset-btn.on .preset-title::after { content: ' · on'; font-weight: 400; opacity: .7; }
+
+.setting-note { margin: 6px 2px 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-dim); }
+
+.hand-clock {
+  font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-dim);
+  letter-spacing: .04em;
+}
+.hand-clock.low { color: var(--gold); }
+.hand-clock.warn { color: var(--burgundy); font-weight: 700; }
+
+.pnl-clock {
+  margin: 10px 0 2px; text-align: center; font-size: 13px; letter-spacing: .04em;
+  color: var(--ink-dim); font-variant-numeric: tabular-nums;
+}
+.pnl-clock.warn { color: var(--burgundy); font-weight: 700; }
+
+.prompt.urgent { color: var(--burgundy); font-weight: 700; }
+.hint.warn-hint { color: var(--burgundy); }

@@ -2,11 +2,13 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 3;
+  const APP_VERSION = 4;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, quoteShownAt = 0, timerHandle = null, statWindow = 0;
+  let handHandle = null, pnlHandle = null, pnlShownAt = 0;
   let pendingSide = null, probEst = null;
+  const clock = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   const money = n => '€' + (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
   const fmt = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString();
   const pct = f => Math.round(f * 100) + '%';
@@ -53,7 +55,10 @@
     const rounds = (settings.fullDeck ? 52 : 13) - 1;
     el('start-desc').textContent = (settings.fullDeck ? '52 cards' : '13 cards') + ' · ' + rounds + ' bets · ' +
       money(settings.bankroll) + (settings.hideBankroll ? ' · bankroll hidden' : '') +
-      (settings.timerSec ? ' · ' + settings.timerSec + 's' : '');
+      (settings.timerSec ? ' · ' + settings.timerSec + 's a bet' : '') +
+      (settings.handSec ? ' · ' + clock(settings.handSec) + ' hand' : '') +
+      (settings.pnlSec ? ' · ' + settings.pnlSec + 's for P&L' : '');
+    el('btn-interview').classList.toggle('on', Store.isInterviewMode(settings));
     const R = Ready.evaluate(), badge = el('ready-badge');
     badge.className = 'ready-badge ' + (R.enoughData ? R.cls : '');
     badge.textContent = R.enoughData ? R.verdict + ' · ' + Math.round(R.score * 100) + '%'
@@ -88,6 +93,8 @@
       grid.appendChild(b);
     });
     container.appendChild(disp); container.appendChild(grid);
+    /* value() is what a clock submits on your behalf when it runs out — null if you typed nothing. */
+    return { value: () => { const v = parseFloat(buf); return Number.isFinite(v) ? v : null; } };
   }
 
   /* ---------- rendering ---------- */
@@ -112,11 +119,49 @@
     if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
     el('g-timer').textContent = ''; el('g-timer').classList.remove('warn');
   }
+  function stopHandClock() {
+    if (handHandle) { clearInterval(handHandle); handHandle = null; }
+    el('g-hand').textContent = ''; el('g-hand').className = 'hand-clock';
+  }
+  function stopPnlClock() {
+    if (pnlHandle) { clearInterval(pnlHandle); pnlHandle = null; }
+  }
+  function stopAllClocks() { stopTimer(); stopHandClock(); stopPnlClock(); }
+
+  /* All three clocks run off a wall-clock deadline rather than a per-tick counter: a
+   * backgrounded tab throttles setInterval, and a clock that quietly pauses when the phone
+   * dims is not a clock. Ticking at 250ms just keeps the display honest. */
+  function countdown(seconds, paint, onExpire) {
+    const deadline = performance.now() + seconds * 1000;
+    const left = () => Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+    paint(left());
+    return setInterval(() => {
+      const s = left();
+      paint(s);
+      if (s <= 0) onExpire();
+    }, 250);
+  }
+
+  /* The clock for the whole hand. On expiry you are stopped mid-deck and asked for your
+   * number anyway, which is the failure mode worth rehearsing. */
+  function startHandClock() {
+    if (!settings.handSec) return;
+    const h = el('g-hand');
+    handHandle = countdown(settings.handSec, s => {
+      h.textContent = clock(s);
+      h.className = 'hand-clock' + (s <= 30 ? ' warn' : (s <= 60 ? ' low' : ''));
+    }, () => {
+      stopTimer(); stopHandClock();
+      if (!st.over) Game.endEarly(st);        // already over = you beat the clock on the last card
+      finishHand();
+    });
+  }
 
   /* ---------- game flow ---------- */
   function startGame() {
     st = Game.newGame(settings);
     showScreen('game');
+    startHandClock();
     nextRound();
   }
   function nextRound() {
@@ -153,12 +198,10 @@
     el('a-pass').onclick = () => commit('pass', 0, false);
     quoteShownAt = performance.now();
     if (settings.timerSec) {
-      let left = settings.timerSec;
-      const t = el('g-timer'); t.textContent = left + 's';
-      timerHandle = setInterval(() => {
-        left -= 1; t.textContent = left + 's'; t.classList.toggle('warn', left <= 5);
-        if (left <= 0) { stopTimer(); commit(pendingSide || 'pass', 0, true); }
-      }, 1000);
+      const t = el('g-timer');
+      timerHandle = countdown(settings.timerSec,
+        s => { t.textContent = s + 's'; t.classList.toggle('warn', s <= 5); },
+        () => { stopTimer(); commit(pendingSide || 'pass', 0, true); });
     }
   }
 
@@ -208,24 +251,50 @@
 
   /* ---------- end of hand: state your own P&L ---------- */
   function finishHand() {
-    stopTimer();
+    stopTimer(); stopHandClock();
     el('g-cards').innerHTML = '';
     renderSeen();
-    el('g-round').textContent = 'Hand complete';
+    el('g-round').textContent = st.clockExpired ? 'Time — ' + st.log.length + ' bets in' : 'Hand complete';
     const p = el('g-panel');
-    p.innerHTML = '<p class="prompt">You started with ' + money(st.start) +
-      '. What is your bankroll now? No scrolling back — state it from your own running total.</p>';
-    keypad(p, { placeholder: 'final bankroll', onSubmit: v => { Game.submitFinal(st, v); showResults(); } });
+    p.innerHTML = (st.clockExpired ? '<p class="prompt urgent">Time is up. You are stopped here.</p>' : '') +
+      '<p class="prompt">You started with ' + money(st.start) +
+      '. What is your bankroll now? No scrolling back — state it from your own running total.</p>' +
+      (settings.pnlSec ? '<div class="pnl-clock" id="pnl-clock"></div>' : '');
+    let done = false;
+    const submit = (v, timedOut) => {
+      if (done) return; done = true;
+      stopPnlClock();
+      Game.submitFinal(st, v, performance.now() - pnlShownAt, timedOut);
+      showResults();
+    };
+    const kp = keypad(p, { placeholder: 'final bankroll', onSubmit: v => submit(v, false) });
+    pnlShownAt = performance.now();
+    if (settings.pnlSec) {
+      const c = el('pnl-clock');
+      pnlHandle = countdown(settings.pnlSec,
+        s => { c.textContent = s + 's to answer'; c.classList.toggle('warn', s <= 5); },
+        () => submit(kp.value(), true));           // whatever you had typed, or nothing
+    }
   }
 
   function showResults() {
     const sum = Game.summary(st);
     Store.saveGame(sum);
     const b = el('results-body');
-    const pnlRow = sum.pnlCorrect
-      ? '<div class="verdict ok"><div class="big">P&L right</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) + '</p></div>'
+    const took = sum.pnlMs == null ? '' : ' · answered in ' + (sum.pnlMs / 1000).toFixed(1) + 's';
+    const pnlRow = sum.statedFinal == null
+      ? '<div class="verdict no"><div class="big">No answer</div><p>The clock ran out before you gave a number — actual ' +
+        money(sum.bankrollEnd) + '. In the room that reads as having lost track.</p></div>'
+      : sum.pnlCorrect
+      ? '<div class="verdict ok"><div class="big">P&L right</div><p>You said ' + money(sum.statedFinal) + ' — actual ' +
+        money(sum.bankrollEnd) + took + (sum.pnlTimedOut ? ' (on the buzzer)' : '') + '</p></div>'
       : '<div class="verdict no"><div class="big">P&L wrong</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) +
-        ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%)</p></div>';
+        ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%)' + took + '</p></div>';
+    const clockRow = sum.clockExpired
+      ? '<p class="hint warn-hint">Hand clock ran out with ' + (sum.roundsAvailable - sum.rounds) + ' of ' +
+        sum.roundsAvailable + ' bets unplayed. Sizing takes seconds once you trust |h−l|/n — the time goes on second-guessing.</p>'
+      : (sum.handMs ? '<p class="hint">Hand took ' + clock(Math.round(sum.handMs / 1000)) +
+        (sum.settings.handSec ? ' of ' + clock(sum.settings.handSec) : '') + '.</p>' : '');
     const num = (x, d) => x == null ? '–' : (+x).toFixed(d == null ? 1 : d);
     b.innerHTML = pnlRow +
       '<section class="card"><div class="kpis">' +
@@ -237,7 +306,9 @@
       '<div><b>' + num(sum.growthGiveUp, 2) + '</b><span>doublings given up</span></div>' +
       '</div>' +
       (sum.passCount ? '<p class="hint">Zero-edge rounds: ' + sum.passCount + ', passed correctly ' + Math.round(sum.passDiscipline * 100) + '%.</p>' : '') +
-      (sum.timeouts ? '<p class="hint">' + sum.timeouts + ' timeouts.</p>' : '') +
+      (sum.timeouts ? '<p class="hint warn-hint">' + sum.timeouts + ' decision' + (sum.timeouts > 1 ? 's' : '') +
+        ' timed out — a timeout is scored as a pass, and in the room it is a freeze.</p>' : '') +
+      clockRow +
       '</section>' +
       '<section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl">' +
       '<tr><th>#</th><th>card</th><th>h/l</th><th>you</th><th>Kelly</th><th>next</th><th>P&L</th><th>bank</th></tr>' +
@@ -273,7 +344,12 @@
   el('btn-start').onclick = startGame;
   el('btn-again').onclick = startGame;
   el('btn-home').onclick = () => showScreen('home');
-  el('btn-quit').onclick = () => { if (confirm('Quit this hand? It will not be saved.')) { stopTimer(); showScreen('home'); } };
+  el('btn-quit').onclick = () => { if (confirm('Quit this hand? It will not be saved.')) { stopAllClocks(); showScreen('home'); } };
+  el('btn-interview').onclick = () => {
+    const on = Store.isInterviewMode(settings);
+    Object.keys(Store.INTERVIEW).forEach(k => { settings[k] = on ? Store.DEFAULTS[k] : Store.INTERVIEW[k]; });
+    Store.saveSettings(settings); syncSettingsUI(); refreshHome();
+  };
   document.querySelectorAll('#tabbar button').forEach(b => b.onclick = () => showScreen(b.dataset.tab));
   el('seg-stat-window').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;

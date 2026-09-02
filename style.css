@@ -163,3 +163,18 @@ h3 { font-family: var(--serif); font-size: 17px; font-weight: 600; margin-bottom
 .tabbar button.on { color: var(--felt-deep); border-top-color: var(--felt); }
 .tab-icon { font-size: 16px; }
 .update-banner { position: fixed; left: 16px; right: 16px; bottom: calc(var(--sab) + 64px); background: var(--gold); color: #2a1d05; font-weight: 600; border-radius: var(--r); padding: 12px; font-size: 14px; }
+
+/* ---------- higher/lower game additions ---------- */
+.seen-strip { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; min-height: 20px; }
+.chip { font-family: var(--serif); font-size: 12px; padding: 2px 6px; border-radius: 5px;
+        border: 1px solid var(--line); background: var(--white); color: var(--ink-dim); }
+.chip.red { color: var(--burgundy); }
+.chip:last-child { border-color: var(--felt); color: var(--ink); font-weight: 700; background: #e8f1ea; }
+.seen-hidden { font-size: 12px; color: var(--ink-dim); font-style: italic; }
+.next-slot { width: 84px; height: 120px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+             font-family: var(--serif); font-size: 40px; color: rgba(255,255,255,0.35);
+             border: 2px dashed rgba(255,255,255,0.35); }
+.bank.hidden-bank { color: var(--ink-dim); letter-spacing: 0.08em; font-family: var(--serif); }
+.hint-inline { font-size: 12px; color: var(--felt-deep); background: #e8f1ea; border: 1px solid #bfe0cb;
+               border-radius: var(--r); padding: 6px 9px; margin-bottom: 8px; text-align: center; }
+.size-grid { grid-template-columns: repeat(4, 1fr); }

@@ -1,21 +1,18 @@
 /* Persistence — settings + game history in localStorage. No backend. */
 const Store = (function () {
-  const KEY_SETTINGS = 'cmt.settings.v1';
-  const KEY_GAMES = 'cmt.games.v1';
+  const KEY_SETTINGS = 'cbt.settings.v1';
+  const KEY_GAMES = 'cbt.games.v1';
 
   const DEFAULTS = {
-    aceHigh: false,          // ace = 1 (false) or 14 (true)
-    aceSwitch: false,        // flip the ace rule mid-game (the interviewer's twist)
-    cards: 3,                // cards per round
-    rounds: 12,              // rounds per game (max floor(52/cards))
-    flashMs: 2000,           // how long the cards show face-up
-    spreadMin: 3, spreadMax: 5,
-    mispriceSd: 2.5,         // sd of quote-mid offset from true fair
-    maxSize: 10,
-    askFair: true,           // prompt for your fair value before the quote appears
-    timerSec: 0,             // decision timer, 0 = off
-    showCount: false,        // training aid: show remaining-deck stats after each round
     bankroll: 1000,
+    fullDeck: false,        // 13 distinct cards; true = 52 cards, ties possible
+    tieRule: 'push',        // only matters with the full deck
+    hideBankroll: true,     // the point: carry your own P&L
+    hideSeen: false,        // hide the cards already turned (memory mode)
+    showKelly: false,       // training wheels: show the counts and the Kelly stake
+    askProb: false,         // ask for your probability before you size
+    timerSec: 0,            // decision clock, 0 = off
+    pnlTolerance: 0.02,     // final P&L accepted within this fraction (0 = exact)
   };
 
   function loadSettings() {
@@ -38,7 +35,7 @@ const Store = (function () {
   }
   function importJSON(text) {
     const j = JSON.parse(text);
-    if (!j || !Array.isArray(j.games)) throw new Error('Not a Card Market export');
+    if (!j || !Array.isArray(j.games)) throw new Error('Not a Card Bet export');
     const existing = loadGames();
     const ids = new Set(existing.map(g => g.id));
     const merged = existing.concat(j.games.filter(g => !ids.has(g.id)));

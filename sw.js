@@ -1,6 +1,6 @@
 /* Offline cache — stale-while-revalidate: serves from cache instantly, then
  * refreshes in the background. Bump CACHE together with version.json + APP_VERSION. */
-const CACHE = 'cmt-v2';
+const CACHE = 'cbt-v3';
 const ASSETS = [
   './', './index.html', './style.css',
   './js/storage.js', './js/game.js', './js/stats.js', './js/ready.js', './js/app.js',

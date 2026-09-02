@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Card Market Trainer</title>
-  <meta name="description" content="The interview card-sum market-making game: trade the quote, size your edge, state your own P&L from memory">
+  <title>Card Bet Trainer</title>
+  <meta name="description" content="The higher/lower betting game: count the deck, size with Kelly, carry your own P&L">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="CardMarket">
+  <meta name="apple-mobile-web-app-title" content="CardBet">
   <meta name="theme-color" content="#f4efe6">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -19,42 +19,35 @@
   <!-- ============ HOME ============ -->
   <main id="screen-home" class="screen active">
     <header class="home-header">
-      <div><h1>Card Market</h1>
-      <p class="subtitle">the interview card-sum game &middot; all data stays on this device</p></div>
+      <div><h1>Card Bet</h1>
+      <p class="subtitle">higher or lower &middot; count the deck, size with Kelly, carry your own P&amp;L</p></div>
       <span class="ready-badge" id="ready-badge">readiness: play to unlock</span>
     </header>
 
     <button class="start-btn" id="btn-start">
-      <span class="start-title">Start game</span>
+      <span class="start-title">Deal</span>
       <span class="start-desc" id="start-desc"></span>
     </button>
     <p class="best-line" id="best-line"></p>
 
     <section class="settings-panel">
       <h2>Game</h2>
-      <div class="setting-row"><label>Ace counts as</label>
-        <div class="seg" data-key="aceHigh"><button data-val="false">1 (low)</button><button data-val="true">14 (high)</button></div></div>
-      <div class="setting-row"><label>Cards per round</label>
-        <div class="seg" data-key="cards"><button data-val="2">2</button><button data-val="3">3</button><button data-val="4">4</button></div></div>
-      <div class="setting-row"><label>Rounds</label>
-        <div class="seg" data-key="rounds"><button data-val="6">6</button><button data-val="12">12</button><button data-val="max">whole deck</button></div></div>
-      <div class="setting-row"><label>Cards shown for</label>
-        <div class="seg" data-key="flashMs"><button data-val="1000">1s</button><button data-val="2000">2s</button><button data-val="3000">3s</button><button data-val="0">until tap</button></div></div>
-
-      <h2>Difficulty</h2>
-      <div class="setting-row"><label>Quote spread</label>
-        <div class="seg" data-key="spreadPreset"><button data-val="tight">2&ndash;4</button><button data-val="normal">3&ndash;5</button><button data-val="wide">4&ndash;8</button></div></div>
-      <div class="setting-row"><label>Mispricing</label>
-        <div class="seg" data-key="mispriceSd"><button data-val="1.5">subtle</button><button data-val="2.5">normal</button><button data-val="4">obvious</button></div></div>
-      <div class="setting-row"><label>Max size</label>
-        <div class="seg" data-key="maxSize"><button data-val="5">5</button><button data-val="10">10</button><button data-val="20">20</button></div></div>
+      <div class="setting-row"><label>Deck</label>
+        <div class="seg" data-key="fullDeck"><button data-val="false">13 cards</button><button data-val="true">52 cards</button></div></div>
+      <div class="setting-row" id="row-tie"><label>Ties count as</label>
+        <div class="seg" data-key="tieRule"><button data-val="push">push</button><button data-val="loss">a loss</button></div></div>
+      <div class="setting-row"><label>Starting bankroll</label>
+        <div class="seg" data-key="bankroll"><button data-val="1000">1000</button><button data-val="100">100</button></div></div>
       <div class="setting-row"><label>Decision timer</label>
         <div class="seg" data-key="timerSec"><button data-val="0">off</button><button data-val="15">15s</button><button data-val="30">30s</button></div></div>
+      <div class="setting-row"><label>Final P&amp;L accepted within</label>
+        <div class="seg" data-key="pnlTolerance"><button data-val="0">exact</button><button data-val="0.02">2%</button><button data-val="0.1">10%</button></div></div>
 
-      <h2>Twists &amp; aids</h2>
-      <label class="toggle-row"><span>Ask my fair value before showing the quote <small>measures whether you track the deck</small></span><input type="checkbox" data-key="askFair"></label>
-      <label class="toggle-row"><span>Switch the ace rule mid-game <small>the interviewer's twist: 1 &harr; 14 halfway through</small></span><input type="checkbox" data-key="aceSwitch"></label>
-      <label class="toggle-row"><span>Show remaining-deck stats after each round <small>training wheels &mdash; turn off before the real thing</small></span><input type="checkbox" data-key="showCount"></label>
+      <h2>Difficulty</h2>
+      <label class="toggle-row"><span>Hide my bankroll during play <small>the whole point &mdash; you state the final number from memory</small></span><input type="checkbox" data-key="hideBankroll"></label>
+      <label class="toggle-row"><span>Hide the cards already turned <small>harder than the real game, where they stay on the table</small></span><input type="checkbox" data-key="hideSeen"></label>
+      <label class="toggle-row"><span>Ask my probability before I size <small>forces you to count before you bet</small></span><input type="checkbox" data-key="askProb"></label>
+      <label class="toggle-row"><span>Show the counts and the Kelly stake <small>training wheels &mdash; turn off before the real thing</small></span><input type="checkbox" data-key="showKelly"></label>
     </section>
   </main>
 
@@ -65,7 +58,7 @@
       <span id="g-bank" class="bank">&euro;1000</span>
       <span id="g-timer" class="timer"></span>
     </div>
-    <div id="g-banner" class="banner" hidden></div>
+    <div id="g-seen" class="seen-strip"></div>
     <div class="cards" id="g-cards"></div>
     <div id="g-panel" class="panel"></div>
     <button class="quit" id="btn-quit">quit</button>
@@ -73,10 +66,10 @@
 
   <!-- ============ RESULTS ============ -->
   <main id="screen-results" class="screen">
-    <h1>Game over</h1>
+    <h1>Hand over</h1>
     <div id="results-body"></div>
     <div class="row-btns">
-      <button class="btn" id="btn-again">Play again</button>
+      <button class="btn" id="btn-again">Deal again</button>
       <button class="btn ghost" id="btn-home">Home</button>
     </div>
   </main>
@@ -103,33 +96,34 @@
   <main id="screen-learn" class="screen learn">
     <h1>The game</h1>
     <section class="card">
-      <h3>Rules, as played in interviews</h3>
-      <p>Three cards are dealt face down from one 52-card deck and you're quoted a market on their sum, e.g. <b>24 at 28</b>. You work out what the sum is worth, compare it to the quote and hit the side that's off: <b>buy</b> if fair is above the offer, <b>sell</b> if it's below the bid, <b>pass</b> if fair sits inside the spread. Then you pick a size. The cards flash face up for a couple of seconds and flip back, and you have to state your own P&amp;L from memory. You start with &euro;1000. Cards do <b>not</b> go back in the deck.</p>
+      <h3>Rules</h3>
+      <p>Cards are turned one at a time. Before each new card you bet a fraction of your bankroll on whether it will be <b>higher</b> or <b>lower</b> than the card showing. You start with &euro;1000 and play until the deck runs out &mdash; 12 bets with a 13-card deck. Every card already turned stays visible, so nothing is hidden from you.</p>
     </section>
     <section class="card">
-      <h3>Baseline fair value</h3>
-      <p>With ace = 1 each card averages 7, so three cards average <b>21</b>. With ace = 14 each averages 8, so <b>24</b>. The sum's standard deviation is about <b>6.5</b> (one card ~3.7, times &radic;3) &mdash; landing a few points off fair is normal, so a single loss tells you nothing about whether the trade was right.</p>
-      <p>Full-deck sums: 4 &times; (1+2+&hellip;+13) = <b>364</b> with ace low; <b>416</b> with ace high.</p>
+      <h3>The one rule you need</h3>
+      <p>Count what is left. If the card showing is <b>c</b>, and of the <b>n</b> unseen cards <b>h</b> are higher and <b>l</b> are lower, then bet</p>
+      <p style="text-align:center"><b>|h &minus; l| / n</b> of your bankroll on the majority side.</p>
+      <p>That is just Kelly: for an even-money bet the growth-optimal stake is f = p &minus; q = 2p &minus; 1, and here p = max(h,l)/n, so 2p &minus; 1 = |h &minus; l|/n. You never have to remember a formula &mdash; you read it straight off the count.</p>
     </section>
     <section class="card">
-      <h3>Why you can't just say 21 forever</h3>
-      <p>Fair value is always <b>cards per round &times; (sum of cards still in the deck) &divide; (cards still in the deck)</b>. Seen cards are gone. Example: you've seen 15 cards averaging 9. Remaining sum = 364 &minus; 135 = 229 over 37 cards = 6.19 per card, so fair = <b>18.6</b>, not 21 &mdash; a bigger move than most of the mispricing in the quotes. Keep a running count and sum; every card above the current mean drags fair down, every card below pulls it up.</p>
+      <h3>Why full Kelly is safe here</h3>
+      <p>Normally you bet a <i>fraction</i> of Kelly because your probabilities are estimates. Here they are counted facts, not a model. And the stake reaches 100% only when h or l is zero &mdash; that is, only when the win is <b>certain</b>. So full Kelly in this game can never bust you. Say that out loud; it is the sharpest observation available about the sizing.</p>
     </section>
     <section class="card">
-      <h3>Edge and sizing</h3>
-      <p>Edge = fair &minus; offer when buying, bid &minus; fair when selling. Size should <b>scale with edge</b>: a one-point edge gets a small clip, a five-point edge gets near your max. This app's "suggested size" is max size &times; edge &divide; (one standard deviation of the sum), capped &mdash; a rule of thumb, not gospel; what's graded is that bigger edges get bigger sizes.</p>
+      <h3>First bet, by the card showing</h3>
+      <p>With 12 unseen the stake is |14 &minus; 2c| / 12: <b>A or K</b> 100% &middot; <b>2 or Q</b> 83% &middot; <b>3 or J</b> 67% &middot; <b>4 or 10</b> 50% &middot; <b>5 or 9</b> 33% &middot; <b>6 or 8</b> 17% &middot; <b>7</b> no edge, pass.</p>
     </section>
     <section class="card">
-      <h3>P&amp;L from memory</h3>
-      <p>Bought at the offer A with size s: P&amp;L = (sum &minus; A) &times; s. Sold at the bid B: P&amp;L = (B &minus; sum) &times; s. Sign discipline matters more than speed &mdash; a losing trade reported as a win is the classic miss. Remember the cards as a sum, not as three faces.</p>
+      <h3>What to expect</h3>
+      <p>Over 200,000 simulated games, full Kelly ends with a median around <b>&euro;55,000</b> and a mean near &euro;100,000, and finishes below the starting &euro;1000 only about 0.2% of the time. You get on average <b>2(H<sub>13</sub> &minus; 1) &asymp; 4.4 certain-win rounds</b> per game &mdash; free doublings, because as the deck empties the card showing is often the highest or lowest left. Typical growth is about 5.7 doublings.</p>
     </section>
     <section class="card">
-      <h3>"How would the game change if ace is high?"</h3>
-      <p>A reported follow-up. Fair rises from 21 to 24 (deck sum 416); per-card spread widens slightly (values 2&ndash;14 instead of 1&ndash;13, but the same 13 equally likely values so the standard deviation is identical); your running count must use the new values for every ace seen <b>and</b> for the aces still in the deck. If the rule switches mid-game, recompute the remaining-deck sum immediately &mdash; each unseen ace is now worth 13 more.</p>
+      <h3>The trap worth naming</h3>
+      <p>Betting everything whenever you have any edge has a <i>higher</i> expected value (about &euro;213,000) but a <b>median of zero</b> &mdash; it busts 89% of the time. Maximising E[wealth] and E[log wealth] give completely different answers, and Kelly targets the growth rate that survives repetition. Flat-betting 25% every round is far worse than Kelly too, at a median around &euro;5,200.</p>
     </section>
     <section class="card">
-      <h3>Where this game is reported</h3>
-      <p>Described first-hand by a candidate from last year's IMC graduate process (played late in the process, two interviewers) as "basically the same" game used at Optiver. The scraped accounts corroborate it: a Chicago IMC final with "a treasure game and <b>card sum game</b>", an Amsterdam trader round (June 2026) with "a <b>betting game with cards</b> and a continuous random variable question", and a Chicago final with "a strategy/card game". Prep sites describe the same card game for both firms.</p>
+      <h3>Ask before you start</h3>
+      <p>Are ties possible (a 52-card deck) and is a tie a push or a loss? Is it even money? Must you bet every round or can you pass at zero edge? Is the comparison always against the most recent card? Fifteen seconds of clarifying questions shows exactly the instinct being tested.</p>
     </section>
   </main>
 

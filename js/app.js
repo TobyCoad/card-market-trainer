@@ -2,19 +2,20 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 2;
+  const APP_VERSION = 3;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
-  let st = null, phase = null, quoteShownAt = 0, timerHandle = null, flashHandle = null;
-  let pendingAction = null, fairEst = null, statWindow = 0;
-  const fmt = n => (n >= 0 ? '+' : '') + n;
-  const SPREADS = { tight: [2, 4], normal: [3, 5], wide: [4, 8] };
+  let st = null, quoteShownAt = 0, timerHandle = null, statWindow = 0;
+  let pendingSide = null, probEst = null;
+  const money = n => '€' + (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const fmt = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString();
+  const pct = f => Math.round(f * 100) + '%';
 
   /* ---------- screens ---------- */
   function showScreen(name) {
     for (const s of screens) el('screen-' + s).classList.toggle('active', s === name);
     el('tabbar').classList.toggle('hidden', name === 'game');
-    const tab = name === 'stats' ? 'stats' : name === 'learn' ? 'learn' : name === 'ready' ? 'ready' : 'home';
+    const tab = ['stats', 'learn', 'ready'].includes(name) ? name : 'home';
     document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
     if (name === 'stats') Stats.render(statWindow);
     if (name === 'ready') Ready.render();
@@ -24,47 +25,45 @@
   }
 
   /* ---------- settings ---------- */
-  function maxRounds() { return Math.floor(52 / settings.cards); }
   function syncSettingsUI() {
     document.querySelectorAll('.seg[data-key]').forEach(seg => {
       const key = seg.dataset.key;
-      let cur;
-      if (key === 'spreadPreset') cur = Object.keys(SPREADS).find(k => SPREADS[k][0] === settings.spreadMin && SPREADS[k][1] === settings.spreadMax) || 'normal';
-      else if (key === 'rounds') cur = settings.rounds >= maxRounds() ? 'max' : String(settings.rounds);
-      else cur = String(settings[key]);
+      const cur = String(settings[key]);
       seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.val === cur));
     });
     document.querySelectorAll('input[type=checkbox][data-key]').forEach(c => { c.checked = !!settings[c.dataset.key]; });
+    el('row-tie').style.display = settings.fullDeck ? '' : 'none';
   }
   function wireSettings() {
     document.querySelectorAll('.seg[data-key]').forEach(seg => {
       seg.addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return;
         const key = seg.dataset.key, v = b.dataset.val;
-        if (key === 'spreadPreset') { settings.spreadMin = SPREADS[v][0]; settings.spreadMax = SPREADS[v][1]; }
-        else if (key === 'rounds') settings.rounds = v === 'max' ? 99 : +v;
-        else if (key === 'aceHigh') settings.aceHigh = v === 'true';
+        if (v === 'true' || v === 'false') settings[key] = (v === 'true');
+        else if (key === 'tieRule') settings[key] = v;
         else settings[key] = +v;
-        if (settings.rounds !== 99) settings.rounds = Math.min(settings.rounds, maxRounds());
         Store.saveSettings(settings); syncSettingsUI(); refreshHome();
       });
     });
     document.querySelectorAll('input[type=checkbox][data-key]').forEach(c => {
-      c.addEventListener('change', () => { settings[c.dataset.key] = c.checked; Store.saveSettings(settings); });
+      c.addEventListener('change', () => { settings[c.dataset.key] = c.checked; Store.saveSettings(settings); refreshHome(); });
     });
   }
   function refreshHome() {
-    const r = settings.rounds >= maxRounds() ? maxRounds() : settings.rounds;
-    el('start-desc').textContent = settings.cards + ' cards · ' + r + ' rounds · ace = ' + (settings.aceHigh ? 14 : 1) + ' · €' + settings.bankroll + (settings.timerSec ? ' · ' + settings.timerSec + 's timer' : '');
-    const games = Store.loadGames();
-    const R = Ready.evaluate();
-    const badge = el('ready-badge');
+    const rounds = (settings.fullDeck ? 52 : 13) - 1;
+    el('start-desc').textContent = (settings.fullDeck ? '52 cards' : '13 cards') + ' · ' + rounds + ' bets · ' +
+      money(settings.bankroll) + (settings.hideBankroll ? ' · bankroll hidden' : '') +
+      (settings.timerSec ? ' · ' + settings.timerSec + 's' : '');
+    const R = Ready.evaluate(), badge = el('ready-badge');
     badge.className = 'ready-badge ' + (R.enoughData ? R.cls : '');
-    badge.textContent = R.enoughData ? R.verdict + ' · ' + Math.round(R.score * 100) + '%' : 'readiness: ' + R.roundsSeen + '/30 rounds';
-    if (!games.length) { el('best-line').textContent = 'No games yet.'; return; }
+    badge.textContent = R.enoughData ? R.verdict + ' · ' + Math.round(R.score * 100) + '%'
+                                     : 'readiness: ' + R.gamesSeen + '/5 games';
+    const games = Store.loadGames();
+    if (!games.length) { el('best-line').textContent = 'No hands yet.'; return; }
     const last = games[games.length - 1];
-    const best = Math.max.apply(null, games.map(g => g.pnl));
-    el('best-line').textContent = games.length + ' games · last: ' + fmt(last.pnl) + ' (' + Math.round(last.decisionAcc * 100) + '% decisions, ' + Math.round(last.pnlAcc * 100) + '% P&L) · best: ' + fmt(best);
+    const best = Math.max.apply(null, games.map(g => g.bankrollEnd));
+    el('best-line').textContent = games.length + ' hands · last: ' + money(last.bankrollEnd) +
+      ' (' + Math.round(last.sideAcc * 100) + '% right side, P&L ' + (last.pnlCorrect ? 'right' : 'wrong') + ') · best: ' + money(best);
   }
 
   /* ---------- keypad ---------- */
@@ -73,27 +72,45 @@
     const disp = document.createElement('div');
     disp.className = 'kp-display placeholder'; disp.textContent = opts.placeholder || '';
     const grid = document.createElement('div'); grid.className = 'keypad';
-    const keys = ['7', '8', '9', 'OK', '4', '5', '6', '1', '2', '3', opts.allowNeg ? '−' : (opts.allowDec ? '.' : ''), '0', '⌫'];
-    let okBtn = null;
+    const keys = ['7', '8', '9', 'OK', '4', '5', '6', '1', '2', '3', '.', '0', '⌫'];
     keys.forEach(k => {
-      if (k === '') { const sp = document.createElement('span'); grid.appendChild(sp); return; }
       const b = document.createElement('button'); b.textContent = k;
-      if (k === 'OK') { b.className = 'ok'; okBtn = b; }
-      if (k === '⌫' || k === '−' || k === '.') b.classList.add('dim');
+      if (k === 'OK') b.className = 'ok';
+      if (k === '⌫' || k === '.') b.classList.add('dim');
       b.addEventListener('click', () => {
-        if (k === 'OK') { const v = parseFloat(buf.replace('−', '-')); if (Number.isFinite(v)) opts.onSubmit(v); return; }
+        if (k === 'OK') { const v = parseFloat(buf); if (Number.isFinite(v)) opts.onSubmit(v); return; }
         if (k === '⌫') buf = buf.slice(0, -1);
-        else if (k === '−') buf = buf.startsWith('−') ? buf.slice(1) : '−' + buf;
-        else if (k === '.') { if (!buf.includes('.')) buf += buf === '' || buf === '−' ? '0.' : '.'; }
-        else if (buf.replace('−', '').length < 6) buf += k;
-        disp.textContent = buf || (opts.placeholder || '');
+        else if (k === '.') { if (!buf.includes('.')) buf += buf === '' ? '0.' : '.'; }
+        else if (buf.replace('.', '').length < 8) buf += k;
+        disp.textContent = buf ? (opts.suffix ? buf + opts.suffix : buf) : (opts.placeholder || '');
         disp.classList.toggle('placeholder', !buf);
       });
       grid.appendChild(b);
     });
     container.appendChild(disp); container.appendChild(grid);
-    if (opts.allowDec) { /* add '.' on the empty slot when negatives are enabled too */ }
-    return { focusOk: () => okBtn };
+  }
+
+  /* ---------- rendering ---------- */
+  function renderCard(c, faceUp) {
+    return '<div class="playing-card' + (faceUp ? ' up' : '') + '"><div class="back"></div>' +
+      '<div class="face' + (c.red ? ' red' : '') + '">' + c.label + '</div></div>';
+  }
+  function renderTop() {
+    const rounds = st.deck.length - 1;
+    el('g-round').textContent = 'Bet ' + Math.min(st.log.length + 1, rounds) + ' / ' + rounds;
+    const b = el('g-bank');
+    if (settings.hideBankroll) { b.textContent = '€ ? ? ?'; b.className = 'bank hidden-bank'; }
+    else { b.textContent = money(st.bankroll); b.className = 'bank ' + (st.bankroll >= st.start ? 'pos' : 'neg'); }
+  }
+  function renderSeen() {
+    const wrap = el('g-seen');
+    if (settings.hideSeen) { wrap.innerHTML = '<span class="seen-hidden">cards turned are hidden</span>'; return; }
+    const seen = st.deck.slice(0, st.pos + 1);
+    wrap.innerHTML = seen.map(c => '<span class="chip' + (c.red ? ' red' : '') + '">' + c.label + '</span>').join('');
+  }
+  function stopTimer() {
+    if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
+    el('g-timer').textContent = ''; el('g-timer').classList.remove('warn');
   }
 
   /* ---------- game flow ---------- */
@@ -102,159 +119,133 @@
     showScreen('game');
     nextRound();
   }
-  function renderTop() {
-    el('g-round').textContent = 'Round ' + st.round + ' / ' + st.settings.rounds;
-    el('g-bank').textContent = '€' + st.bankroll;
-    el('g-bank').className = 'bank ' + (st.bankroll >= st.settings.bankroll ? 'pos' : 'neg');
-  }
-  function renderCards(cards, faceUp, small) {
-    const wrap = el('g-cards'); wrap.innerHTML = ''; wrap.className = 'cards' + (small ? ' small' : '');
-    cards.forEach(c => {
-      const d = document.createElement('div'); d.className = 'playing-card' + (faceUp ? ' up' : '');
-      d.innerHTML = '<div class="back"></div><div class="face' + (c.red ? ' red' : '') + '">' + c.label + '<small>= ' + c.value + '</small></div>';
-      wrap.appendChild(d);
-    });
-  }
-  function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } el('g-timer').textContent = ''; el('g-timer').classList.remove('warn'); }
-
   function nextRound() {
-    if (st.over) return finishGame();
+    if (st.over) return finishHand();
     const c = Game.deal(st);
-    pendingAction = null; fairEst = null;
-    renderTop();
-    const banner = el('g-banner');
-    if (c.ruleChanged) { banner.hidden = false; banner.textContent = 'RULE CHANGE: Ace now counts as ' + (c.aceHigh ? '14' : '1') + ' (was ' + (c.aceHigh ? '1' : '14') + ') — for every card still in the deck.'; }
-    else banner.hidden = true;
-    renderCards(c.cards, false, false);
-    if (st.settings.askFair) phaseFair(); else phaseQuote();
+    pendingSide = null; probEst = null;
+    renderTop(); renderSeen();
+    el('g-cards').innerHTML = renderCard(c.showing, true) + '<div class="next-slot">?</div>';
+    if (settings.askProb) phaseProb(); else phaseSide();
   }
 
-  function phaseFair() {
-    phase = 'fair';
-    const p = el('g-panel'); p.innerHTML = '<p class="prompt">Before the quote: what is the sum of these ' + st.settings.cards + ' cards worth?</p>';
-    keypad(p, { placeholder: 'your fair value', allowDec: true, onSubmit: v => { fairEst = v; phaseQuote(); } });
+  function hintLine() {
+    if (!settings.showKelly) return '';
+    const k = st.current.k;
+    return '<p class="hint-inline">' + k.n + ' unseen · ' + k.h + ' higher · ' + k.l + ' lower' +
+      (k.t ? ' · ' + k.t + ' equal' : '') + ' → Kelly ' + (k.side ? pct(k.f) + ' on ' + k.side : 'no edge, pass') + '</p>';
   }
 
-  function phaseQuote() {
-    phase = 'quote';
-    const c = st.current, p = el('g-panel');
-    p.innerHTML = '<p class="prompt">Market on the sum of ' + st.settings.cards + ' cards</p>' +
-      '<div class="quote">' + c.bid + ' at ' + c.ask + '<small>bid · ask</small></div>' +
+  function phaseProb() {
+    const p = el('g-panel');
+    p.innerHTML = '<p class="prompt">Before you size: what is your probability the next card wins your side?</p>' + hintLine();
+    keypad(p, { placeholder: 'probability %', suffix: '%', onSubmit: v => { probEst = v / 100; phaseSide(); } });
+  }
+
+  function phaseSide() {
+    const p = el('g-panel');
+    p.innerHTML = '<p class="prompt">Higher or lower than ' + st.current.showing.label + '?</p>' + hintLine() +
       '<div class="action-row">' +
-        '<button class="btn sell" id="a-sell">Sell @ ' + c.bid + '</button>' +
+        '<button class="btn sell" id="a-lower">Lower</button>' +
         '<button class="btn pass" id="a-pass">Pass</button>' +
-        '<button class="btn buy" id="a-buy">Buy @ ' + c.ask + '</button></div>';
-    el('a-sell').onclick = () => choose('sell');
-    el('a-buy').onclick = () => choose('buy');
+        '<button class="btn buy" id="a-higher">Higher</button></div>';
+    el('a-lower').onclick = () => chooseSide('lower');
+    el('a-higher').onclick = () => chooseSide('higher');
     el('a-pass').onclick = () => commit('pass', 0, false);
     quoteShownAt = performance.now();
-    if (st.settings.timerSec) {
-      let left = st.settings.timerSec;
+    if (settings.timerSec) {
+      let left = settings.timerSec;
       const t = el('g-timer'); t.textContent = left + 's';
       timerHandle = setInterval(() => {
         left -= 1; t.textContent = left + 's'; t.classList.toggle('warn', left <= 5);
-        if (left <= 0) { stopTimer(); commit(pendingAction || 'pass', pendingAction ? 1 : 0, true); }
+        if (left <= 0) { stopTimer(); commit(pendingSide || 'pass', 0, true); }
       }, 1000);
     }
   }
 
-  function choose(action) {
-    pendingAction = action; phase = 'size';
-    const c = st.current, p = el('g-panel');
-    let html = '<p class="prompt">' + (action === 'buy' ? 'Buying at ' + c.ask : 'Selling at ' + c.bid) + ' — how many?</p><div class="size-grid">';
-    for (let s = 1; s <= st.settings.maxSize; s++) html += '<button data-s="' + s + '">' + s + '</button>';
-    html += '</div><button class="btn ghost wide" id="a-back">back</button>';
-    p.innerHTML = html;
-    p.querySelectorAll('.size-grid button').forEach(b => b.onclick = () => commit(action, +b.dataset.s, false));
-    el('a-back').onclick = () => { pendingAction = null; phaseQuote(); };
+  function chooseSide(side) {
+    pendingSide = side;
+    const p = el('g-panel');
+    const presets = [0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1];
+    p.innerHTML = '<p class="prompt">' + (side === 'higher' ? 'Higher' : 'Lower') + ' — what fraction of your bankroll?</p>' + hintLine() +
+      '<div class="size-grid">' + presets.map(f => '<button data-f="' + f + '">' + pct(f) + '</button>').join('') + '</div>' +
+      '<button class="btn ghost wide" id="a-custom">custom %</button>' +
+      '<button class="btn ghost wide" id="a-back">back</button>';
+    p.querySelectorAll('.size-grid button').forEach(b => b.onclick = () => commit(side, +b.dataset.f, false));
+    el('a-back').onclick = () => phaseSide();
+    el('a-custom').onclick = () => {
+      p.innerHTML = '<p class="prompt">' + (side === 'higher' ? 'Higher' : 'Lower') + ' — fraction of bankroll</p>' + hintLine();
+      keypad(p, { placeholder: 'percent of bankroll', suffix: '%', onSubmit: v => commit(side, Math.max(0, Math.min(100, v)) / 100, false) });
+    };
   }
 
-  function commit(action, size, timedOut) {
+  function commit(side, frac, timedOut) {
     stopTimer();
     const ms = Math.round(performance.now() - quoteShownAt);
-    Game.act(st, action, size, fairEst, ms, timedOut);
-    phaseFlash();
+    const c = Game.bet(st, side, frac, ms, timedOut);
+    c.probEst = probEst;
+    phaseReveal(c);
   }
 
-  function phaseFlash() {
-    phase = 'flash';
-    const c = st.current, p = el('g-panel');
-    renderCards(c.cards, true, false);
-    const what = c.action === 'pass' ? 'You passed.' : (c.action === 'buy' ? 'Bought ' + c.size + ' @ ' + c.ask : 'Sold ' + c.size + ' @ ' + c.bid);
-    if (st.settings.flashMs > 0) {
-      p.innerHTML = '<p class="prompt">' + what + ' — memorise the cards</p><div class="flash-bar"><span style="animation: shrink ' + st.settings.flashMs + 'ms linear forwards"></span></div>';
-      flashHandle = setTimeout(phasePnl, st.settings.flashMs);
-    } else {
-      p.innerHTML = '<p class="prompt">' + what + '</p><button class="btn wide" id="a-hide">Hide cards &amp; enter P&amp;L</button>';
-      el('a-hide').onclick = phasePnl;
-    }
-  }
-
-  function phasePnl() {
-    phase = 'pnl';
-    const c = st.current, p = el('g-panel');
-    renderCards(c.cards, false, false);
-    p.innerHTML = '<p class="prompt">' + (c.action === 'pass' ? 'You passed — what was the sum?' : 'Your P&L this round?') + '</p>';
-    keypad(p, { placeholder: c.action === 'pass' ? 'the sum' : 'P&L (can be negative)', allowNeg: c.action !== 'pass', onSubmit: v => {
-      if (c.action === 'pass') { c.sumEntered = v; Game.submitPnl(st, 0); c.pnlCorrect = Math.round(v) === c.sum; }
-      else Game.submitPnl(st, v);
-      phaseFeedback();
-    } });
-  }
-
-  function phaseFeedback() {
-    phase = 'feedback';
-    const c = st.current, p = el('g-panel'), s = st.settings;
-    renderCards(c.cards, true, true);
-    renderTop();
-    const actionTxt = { buy: 'buy', sell: 'sell', pass: 'pass' };
-    const decisionGood = c.actionCorrect;
-    const pnlTxt = c.action === 'pass'
-      ? (c.pnlCorrect ? 'Sum ' + c.sum + ' — correct' : 'Sum was ' + c.sum + ', you said ' + c.sumEntered)
-      : (c.pnlCorrect ? 'P&L ' + fmt(c.truePnl) + ' — correct' : 'P&L was ' + fmt(c.truePnl) + ', you said ' + fmt(Math.round(c.enteredPnl)));
+  function phaseReveal(c) {
+    renderSeen();
+    el('g-cards').innerHTML = renderCard(c.showing, true) + renderCard(c.next, true);
+    const res = c.result === 'win' ? 'WON' : (c.result === 'lose' ? 'LOST' : (c.side === 'pass' ? 'PASSED' : 'PUSH'));
+    const cls = c.result === 'win' ? 'good' : (c.result === 'lose' ? 'bad' : '');
     let note = '';
-    if (c.timedOut) note += 'Timed out. ';
-    if (!decisionGood) {
-      if (c.correct === 'pass') note += 'Fair ' + c.fair.toFixed(1) + ' sat inside ' + c.bid + '/' + c.ask + ' — no edge, you should have passed. ';
-      else if (c.action === 'pass') note += 'There was ' + c.edge.toFixed(1) + ' of edge to ' + c.correct + ' and you passed. ';
-      else note += 'Wrong side: fair ' + c.fair.toFixed(1) + ' means ' + c.correct + ', not ' + c.action + '. ';
-    } else if (c.action !== 'pass') {
-      const d = c.size - c.suggestedSize;
-      note += 'Edge ' + c.edge.toFixed(1) + ' (' + (c.edge / Math.max(c.sumSd, 1)).toFixed(2) + ' sd). Edge-scaled size ≈ ' + c.suggestedSize + ', you chose ' + c.size + (Math.abs(d) >= 3 ? (d > 0 ? ' — big for that edge.' : ' — small for that edge.') : ' — fine.') + ' Expected P&L ' + fmt(+c.expPnl.toFixed(1)) + ', realised ' + fmt(c.truePnl) + '. ';
+    if (c.side !== 'pass') note = 'You staked ' + pct(c.frac) + (settings.hideBankroll ? '' : ' = ' + money(c.stake)) + ' on ' + c.side + '.';
+    else note = 'You passed.';
+    let coach = '';
+    if (settings.showKelly || !settings.hideBankroll) {
+      coach = '<div class="fb-note">Kelly: ' + (c.k.side ? pct(c.k.f) + ' on ' + c.k.side : 'pass, no edge') +
+        ' (' + c.k.h + ' higher, ' + c.k.l + ' lower of ' + c.k.n + ')</div>';
     }
-    if (Number.isFinite(c.fairEst)) note += 'Your fair ' + c.fairEst + ' vs true ' + c.fair.toFixed(2) + ' (' + (c.fairEst - c.fair >= 0 ? '+' : '') + (c.fairEst - c.fair).toFixed(1) + '). ';
-    let deck = '';
-    if (s.showCount) deck = '<div class="fb-note">Deck now: ' + c.postDeck.n + ' cards, sum ' + c.postDeck.sum + ', mean ' + c.postDeck.mean.toFixed(2) + ' → next fair ' + c.fairNext.toFixed(1) + '. Deck sum before this round was ' + c.preDeck.sum + ' over ' + c.preDeck.n + '.</div>';
-    p.innerHTML = '<div class="fb"><div class="fb-head ' + (decisionGood && c.pnlCorrect ? 'good' : 'bad') + '">' + (decisionGood ? 'Right call' : 'Wrong call') + ' · ' + (c.pnlCorrect ? 'P&L right' : 'P&L wrong') + '</div>' +
-      '<div class="fb-grid"><span class="k">cards</span><b>' + c.cards.map(x => x.label).join(' ') + ' = ' + c.sum + '</b>' +
-      '<span class="k">quote</span><b>' + c.bid + ' at ' + c.ask + '</b>' +
-      '<span class="k">true fair</span><b>' + c.fair.toFixed(2) + '</b>' +
-      '<span class="k">right action</span><b>' + actionTxt[c.correct] + (c.edge ? ' (edge ' + c.edge.toFixed(1) + ')' : '') + '</b>' +
-      '<span class="k">you</span><b>' + actionTxt[c.action] + (c.size ? ' × ' + c.size : '') + ' · ' + (c.decisionMs / 1000).toFixed(1) + 's</b>' +
-      '<span class="k">result</span><b class="' + (c.pnlCorrect ? 'pos' : 'neg') + '">' + pnlTxt + '</b></div>' +
-      (note ? '<div class="fb-note">' + note + '</div>' : '') + deck + '</div>' +
-      '<button class="btn wide" id="a-next">' + (st.over ? 'See results' : 'Next round') + '</button>';
-    el('a-next').onclick = nextRound;
+    const last = st.over;
+    el('g-panel').innerHTML = '<div class="fb"><div class="fb-head ' + cls + '">' + c.next.label + ' — ' + res + '</div>' +
+      '<div class="fb-note">' + note + '</div>' + coach + '</div>' +
+      '<button class="btn wide" id="a-next">' + (last ? 'Done — state your P&L' : 'Next card') + '</button>';
+    el('a-next').onclick = () => { if (last) finishHand(); else nextRound(); };
   }
 
-  function finishGame() {
+  /* ---------- end of hand: state your own P&L ---------- */
+  function finishHand() {
+    stopTimer();
+    el('g-cards').innerHTML = '';
+    renderSeen();
+    el('g-round').textContent = 'Hand complete';
+    const p = el('g-panel');
+    p.innerHTML = '<p class="prompt">You started with ' + money(st.start) +
+      '. What is your bankroll now? No scrolling back — state it from your own running total.</p>';
+    keypad(p, { placeholder: 'final bankroll', onSubmit: v => { Game.submitFinal(st, v); showResults(); } });
+  }
+
+  function showResults() {
     const sum = Game.summary(st);
     Store.saveGame(sum);
     const b = el('results-body');
-    const pct = x => x == null ? '–' : Math.round(x * 100) + '%';
+    const pnlRow = sum.pnlCorrect
+      ? '<div class="verdict ok"><div class="big">P&L right</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) + '</p></div>'
+      : '<div class="verdict no"><div class="big">P&L wrong</div><p>You said ' + money(sum.statedFinal) + ' — actual ' + money(sum.bankrollEnd) +
+        ' (out by ' + money(sum.pnlAbsErr) + ', ' + Math.round(sum.pnlRelErr * 100) + '%)</p></div>';
     const num = (x, d) => x == null ? '–' : (+x).toFixed(d == null ? 1 : d);
-    b.innerHTML = '<section class="card"><div class="kpis">' +
+    b.innerHTML = pnlRow +
+      '<section class="card"><div class="kpis">' +
       '<div><b class="' + (sum.pnl >= 0 ? 'pos' : 'neg') + '">' + fmt(sum.pnl) + '</b><span>P&L' + (sum.bust ? ' (bust)' : '') + '</span></div>' +
-      '<div><b>' + pct(sum.decisionAcc) + '</b><span>decisions right</span></div>' +
-      '<div><b>' + pct(sum.pnlAcc) + '</b><span>P&L calcs right</span></div>' +
-      '<div><b>' + num(sum.avgMs / 1000) + 's</b><span>avg decision</span></div>' +
-      '<div><b>' + num(sum.expPnl, 0) + '</b><span>expected P&L of your trades</span></div>' +
-      '<div><b>' + (sum.sizeEdgeCorr == null ? '–' : num(sum.sizeEdgeCorr, 2)) + '</b><span>size–edge corr</span></div>' +
+      '<div><b>' + Math.round(sum.sideAcc * 100) + '%</b><span>right side</span></div>' +
+      '<div><b>' + num(sum.growth, 2) + '</b><span>doublings</span></div>' +
+      '<div><b>' + Math.round((sum.meanFracErr || 0) * 100) + '%</b><span>avg sizing error</span></div>' +
+      '<div><b>' + (sum.certainCaptured == null ? '–' : Math.round(sum.certainCaptured * 100) + '%') + '</b><span>certain wins taken (' + sum.certainCount + ')</span></div>' +
+      '<div><b>' + num(sum.growthGiveUp, 2) + '</b><span>doublings given up</span></div>' +
       '</div>' +
-      (sum.fairAbsErr != null ? '<p class="hint">Fair-value error: ' + num(sum.fairAbsErr) + ' avg (late rounds ' + num(sum.fairAbsErrLate) + '). Max deck drift from baseline this game: ' + num(sum.driftMax) + '.</p>' : '') +
+      (sum.passCount ? '<p class="hint">Zero-edge rounds: ' + sum.passCount + ', passed correctly ' + Math.round(sum.passDiscipline * 100) + '%.</p>' : '') +
       (sum.timeouts ? '<p class="hint">' + sum.timeouts + ' timeouts.</p>' : '') +
-      '</section><section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl"><tr><th>#</th><th>cards</th><th>sum</th><th>fair</th><th>quote</th><th>right</th><th>you</th><th>P&L</th><th>calc</th></tr>' +
-      sum.log.map(r => '<tr><td>' + r.round + (r.ruleChanged ? '*' : '') + '</td><td>' + r.cards.join(' ') + '</td><td>' + r.sum + '</td><td>' + r.fair.toFixed(1) + '</td><td>' + r.bid + '/' + r.ask + '</td><td>' + r.correct + '</td><td class="' + (r.actionCorrect ? 'pos' : 'neg') + '">' + r.action + (r.size ? '×' + r.size : '') + '</td><td class="' + (r.truePnl >= 0 ? 'pos' : 'neg') + '">' + fmt(r.truePnl) + '</td><td class="' + (r.pnlCorrect ? 'pos' : 'neg') + '">' + (r.pnlCorrect ? '✓' : '✗') + '</td></tr>').join('') +
+      '</section>' +
+      '<section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl">' +
+      '<tr><th>#</th><th>card</th><th>h/l</th><th>you</th><th>Kelly</th><th>next</th><th>P&L</th><th>bank</th></tr>' +
+      sum.log.map(r => '<tr><td>' + r.round + '</td><td>' + r.showing + '</td><td>' + r.h + '/' + r.l + '</td>' +
+        '<td class="' + (r.sideCorrect ? 'pos' : 'neg') + '">' + (r.side === 'pass' ? 'pass' : r.side.slice(0, 2) + ' ' + Math.round(r.frac * 100) + '%') + '</td>' +
+        '<td>' + (r.kSide ? r.kSide.slice(0, 2) + ' ' + Math.round(r.kFrac * 100) + '%' : 'pass') + '</td>' +
+        '<td>' + r.next + '</td><td class="' + (r.pnl >= 0 ? 'pos' : 'neg') + '">' + fmt(r.pnl) + '</td>' +
+        '<td>' + Math.round(r.bankrollAfter) + '</td></tr>').join('') +
       '</table></div></section>';
     showScreen('results');
   }
@@ -263,7 +254,8 @@
   let updateReady = false;
   function maybeShowUpdateBanner() { el('update-banner').hidden = !(updateReady && !el('screen-game').classList.contains('active')); }
   async function checkForUpdate() {
-    try { const r = await fetch('./version.json', { cache: 'no-store' }); const j = await r.json(); if (j.v && j.v !== APP_VERSION) { updateReady = true; maybeShowUpdateBanner(); } } catch (e) { }
+    try { const r = await fetch('./version.json', { cache: 'no-store' }); const j = await r.json();
+      if (j.v && j.v !== APP_VERSION) { updateReady = true; maybeShowUpdateBanner(); } } catch (e) { }
   }
   function applyUpdate() {
     const banner = el('update-banner'); banner.textContent = 'Updating…';
@@ -281,11 +273,13 @@
   el('btn-start').onclick = startGame;
   el('btn-again').onclick = startGame;
   el('btn-home').onclick = () => showScreen('home');
-  el('btn-quit').onclick = () => { if (confirm('Quit this game? It will not be saved.')) { stopTimer(); if (flashHandle) clearTimeout(flashHandle); showScreen('home'); } };
+  el('btn-quit').onclick = () => { if (confirm('Quit this hand? It will not be saved.')) { stopTimer(); showScreen('home'); } };
   document.querySelectorAll('#tabbar button').forEach(b => b.onclick = () => showScreen(b.dataset.tab));
   el('seg-stat-window').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    statWindow = +b.dataset.w; el('seg-stat-window').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); Stats.render(statWindow);
+    statWindow = +b.dataset.w;
+    el('seg-stat-window').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    Stats.render(statWindow);
   });
   el('update-banner').addEventListener('click', applyUpdate);
   showScreen('home');

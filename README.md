@@ -1,37 +1,47 @@
-# Card Market Trainer
+# Card Bet Trainer
 
-The interview "card sum" market-making game as an installable mobile PWA, for on-the-go
-practice before trader rounds at options market makers (reported at IMC and Optiver).
-No backend — every round is logged to `localStorage` and analysed on the device.
+The higher/lower betting game as an installable mobile PWA, for trader interview prep.
+No backend — every hand is logged to `localStorage` and analysed on the device.
 
 ## The game
 
-Each round, N cards (default 3) are dealt face down from one 52-card deck and a market is
-quoted on their sum, e.g. **24 at 28**. You decide: **buy** if your fair value is above the
-offer, **sell** if it's below the bid, **pass** if fair sits inside the spread. Then you pick a
-size. The cards flash face up for a couple of seconds, flip back, and you must enter your own
-P&L from memory. You start with €1000. Cards do not return to the deck, so fair value drifts:
-fair = N × (sum of cards still in the deck) ÷ (cards still in the deck).
+Cards are turned one at a time from a 13-card deck (optionally a full 52). Before each new
+card you bet a fraction of your bankroll on whether it will be **higher** or **lower** than the
+card showing. You start with €1000 and play 12 bets. Every card already turned stays visible,
+so the probability is not a guess — it is a count.
 
-Settings: ace = 1 or 14 (and an optional mid-game rule switch — a reported interviewer twist),
-cards per round, rounds, flash duration, quote spread and mispricing size, max size, decision
-timer, an optional "state your fair value before the quote" prompt, and training-wheels deck
-stats after each round.
+**The rule:** if the card showing is `c`, and of the `n` unseen cards `h` are higher and `l`
+are lower, bet **|h − l| / n** of your bankroll on the majority side. That is Kelly: for an
+even-money bet the growth-optimal stake is `f = 2p − 1`, and here `p = max(h,l)/n`.
 
-## Analytics
+Two properties worth knowing: the stake reaches 100% only when `h` or `l` is zero — i.e. only
+when the win is certain — so **full Kelly here can never bust you**; and you get on average
+`2(H₁₃ − 1) ≈ 4.4` certain-win rounds per hand, which are free doublings.
 
-Every round stores the cards, true fair, quote, correct action, your action/size/time, your
-P&L entry and the truth. The Stats tab computes: decision accuracy by edge size and by deck
-drift (anchoring detection), fair-value estimate error early vs late in the deck, P&L
-calculation accuracy by size / direction / winning-vs-losing trade, sizing discipline
-(size–edge correlation and expected P&L captured), ace-rule breakdowns, per-game trends,
-JSON export/import and reset.
+## What it trains
+
+By default the **bankroll is hidden during play** and you must state your final number from
+memory at the end — that is the part an interviewer actually asks for. The app then grades:
+
+- final P&L accuracy (exact, or within a tolerance you set)
+- picking the right side, broken out by how big the edge was
+- stake versus the Kelly fraction, separately on big and small edges
+- taking the certain wins in full, and passing at zero edge
+- growth given up per hand, in doublings, versus optimal sizing
+- decision speed under an optional clock
+
+Settings cover the 52-card deck (with ties as a push or a loss), hiding the cards already
+turned, being asked your probability before you size, and a training-wheels mode that shows
+the counts and the Kelly stake.
+
+The **Ready?** tab benchmarks recent hands against a prep standard: stating P&L correctly,
+near-perfect side selection and taking every certain win are the three core criteria.
 
 ## Install on iPhone
 
 Open the GitHub Pages URL in Safari → Share → **Add to Home Screen**. Works offline after the
-first load. In-app update banner appears when a new version is deployed (bump `APP_VERSION`
-in `js/app.js`, `v` in `version.json`, and `CACHE` in `sw.js` together).
+first load. When a new version is deployed an update banner appears (bump `APP_VERSION` in
+`js/app.js`, `v` in `version.json`, and `CACHE` in `sw.js` together).
 
 ## Development
 

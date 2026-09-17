@@ -2,7 +2,7 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 6;
+  const APP_VERSION = 7;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, quoteShownAt = 0, timerHandle = null, statWindow = 0;

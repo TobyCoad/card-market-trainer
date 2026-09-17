@@ -1,9 +1,11 @@
 /* Offline cache — stale-while-revalidate: serves from cache instantly, then
  * refreshes in the background. Bump CACHE together with version.json + APP_VERSION. */
-const CACHE = 'cbt-v6';
+const CACHE = 'cbt-v7';
 const ASSETS = [
   './', './index.html', './style.css',
   './js/storage.js', './js/game.js', './js/stats.js', './js/ready.js', './js/app.js',
+  './market/', './market/index.html', './market/style.css',
+  './market/js/storage.js', './market/js/game.js', './market/js/stats.js', './market/js/ready.js', './market/js/app.js',
   './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];

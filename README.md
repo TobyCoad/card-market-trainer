@@ -3,6 +3,16 @@
 The higher/lower betting game as an installable mobile PWA, for trader interview prep.
 No backend — every hand is logged to `localStorage` and analysed on the device.
 
+
+## Two game modes
+
+The switch at the top of the home screen moves between them, and the installed app reopens in whichever you used last.
+
+- **Higher / Lower** - the Kelly betting game described below.
+- **Card-sum market** (`market/`) - the other reported IMC game: each round three cards are dealt face down and a market is quoted on their sum ("24 at 28"). Buy if your fair is above the offer, sell if it is below the bid, pass inside the spread, then pick a size. The cards flash face up for a couple of seconds and hide, and you type your own P&L from memory. EUR 1000 start, no replacement, so fair drifts as the deck depletes: `fair = 21 + 3D/N` with `D = 7n - S`. Options: ace 1 or 14 with a mid-game rule switch, cards per round, rounds, flash time, spread and mispricing, max size, decision timer, "state your fair first", and training-wheels deck stats. It keeps its own history, Stats and Ready tabs (localStorage keys `cmt.*`, separate from the betting game's `cbt.*`).
+
+Both modes share one service worker, one manifest and one version number: bump `APP_VERSION` in **both** `js/app.js` and `market/js/app.js`, `v` in `version.json`, and `CACHE` in `sw.js` together.
+
 ## The game
 
 Cards are turned one at a time from a 13-card deck (optionally a full 52). Before each new

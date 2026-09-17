@@ -2,7 +2,7 @@
 (function () {
   const el = id => document.getElementById(id);
   const screens = ['home', 'game', 'results', 'stats', 'ready', 'learn'];
-  const APP_VERSION = 7;
+  const APP_VERSION = 8;
   window.APP_VERSION = APP_VERSION;
   let settings = Store.loadSettings();
   let st = null, phase = null, quoteShownAt = 0, timerHandle = null, flashHandle = null;
@@ -50,10 +50,11 @@
       });
     });
     document.querySelectorAll('input[type=checkbox][data-key]').forEach(c => {
-      c.addEventListener('change', () => { settings[c.dataset.key] = c.checked; Store.saveSettings(settings); });
+      c.addEventListener('change', () => { settings[c.dataset.key] = c.checked; Store.saveSettings(settings); refreshHome(); });
     });
   }
   function refreshHome() {
+    el('btn-interview').classList.toggle('on', Store.isInterviewMode(settings));
     const r = settings.rounds >= maxRounds() ? maxRounds() : settings.rounds;
     el('start-desc').textContent = settings.cards + ' cards · ' + r + ' rounds · ace = ' + (settings.aceHigh ? 14 : 1) + ' · €' + settings.bankroll + (settings.timerSec ? ' · ' + settings.timerSec + 's timer' : '');
     const games = Store.loadGames();
@@ -99,13 +100,16 @@
   /* ---------- game flow ---------- */
   function startGame() {
     st = Game.newGame(settings);
+    finalAsked = false;
+    el('g-scratch').hidden = !settings.scratchpad;
+    el('g-note').value = '';                  // the notes survive the whole game, not the round
     showScreen('game');
     nextRound();
   }
   function renderTop() {
     el('g-round').textContent = 'Round ' + st.round + ' / ' + st.settings.rounds;
-    el('g-bank').textContent = '€' + st.bankroll;
-    el('g-bank').className = 'bank ' + (st.bankroll >= st.settings.bankroll ? 'pos' : 'neg');
+    if (st.settings.hideBankroll) { el('g-bank').textContent = 'bankroll hidden'; el('g-bank').className = 'bank hidden-bank'; }
+    else { el('g-bank').textContent = '€' + st.bankroll; el('g-bank').className = 'bank ' + (st.bankroll >= st.settings.bankroll ? 'pos' : 'neg'); }
   }
   function renderCards(cards, faceUp, small) {
     const wrap = el('g-cards'); wrap.innerHTML = ''; wrap.className = 'cards' + (small ? ' small' : '');
@@ -172,7 +176,7 @@
   function commit(action, size, timedOut) {
     stopTimer();
     const ms = Math.round(performance.now() - quoteShownAt);
-    Game.act(st, action, size, fairEst, ms, timedOut);
+    Game.act(st, action, size, fairEst, ms, timedOut, st.settings.scratchpad ? el('g-note').value : null);
     phaseFlash();
   }
 
@@ -198,7 +202,7 @@
     keypad(p, { placeholder: c.action === 'pass' ? 'the sum' : 'P&L (can be negative)', allowNeg: c.action !== 'pass', onSubmit: v => {
       if (c.action === 'pass') { c.sumEntered = v; Game.submitPnl(st, 0); c.pnlCorrect = Math.round(v) === c.sum; }
       else Game.submitPnl(st, v);
-      phaseFeedback();
+      if (st.settings.roundFeedback) phaseFeedback(); else nextRound();   // interview: nothing revealed until the end
     } });
   }
 
@@ -237,7 +241,18 @@
     el('a-next').onclick = nextRound;
   }
 
+  let finalAsked = false;
+  function phaseFinal() {
+    phase = 'final'; finalAsked = true;
+    el('g-cards').innerHTML = ''; el('g-banner').hidden = true;
+    const p = el('g-panel');
+    p.innerHTML = '<p class="prompt">That was the last round. What is your total P&amp;L for the game?</p>' +
+      '<p class="hint">Your P&amp;L or your final bankroll, either is accepted, within ' + Math.round((st.settings.pnlTolerance || 0) * 100) + '%.</p>';
+    keypad(p, { placeholder: 'total P&L (can be negative)', allowNeg: true, onSubmit: v => { Game.submitFinal(st, v); finishGame(); } });
+  }
+
   function finishGame() {
+    if (st.settings.hideBankroll && !finalAsked) return phaseFinal();
     const sum = Game.summary(st);
     Store.saveGame(sum);
     const b = el('results-body');
@@ -252,9 +267,11 @@
       '<div><b>' + (sum.sizeEdgeCorr == null ? '–' : num(sum.sizeEdgeCorr, 2)) + '</b><span>size–edge corr</span></div>' +
       '</div>' +
       (sum.fairAbsErr != null ? '<p class="hint">Fair-value error: ' + num(sum.fairAbsErr) + ' avg (late rounds ' + num(sum.fairAbsErrLate) + '). Max deck drift from baseline this game: ' + num(sum.driftMax) + '.</p>' : '') +
+      (sum.finalStated != null ? '<p class="hint"><b class="' + (sum.finalOk ? 'pos' : 'neg') + '">Stated total ' + fmt(sum.finalStated) + (sum.finalOk ? ' - accepted' : ' - off') + '.</b> True P&L ' + fmt(sum.pnl) + ', bankroll €' + sum.bankrollEnd + '.</p>' : '') +
+      (sum.notedRounds ? '<p class="hint">Notes: your running total was right on ' + sum.notesAccurate + ' of ' + sum.notedRounds + ' checkpoints' + (sum.noteFirstDrift ? '; it first drifted going into round ' + sum.noteFirstDrift + '.' : '.') + '</p>' : '') +
       (sum.timeouts ? '<p class="hint">' + sum.timeouts + ' timeouts.</p>' : '') +
-      '</section><section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl"><tr><th>#</th><th>cards</th><th>sum</th><th>fair</th><th>quote</th><th>right</th><th>you</th><th>P&L</th><th>calc</th></tr>' +
-      sum.log.map(r => '<tr><td>' + r.round + (r.ruleChanged ? '*' : '') + '</td><td>' + r.cards.join(' ') + '</td><td>' + r.sum + '</td><td>' + r.fair.toFixed(1) + '</td><td>' + r.bid + '/' + r.ask + '</td><td>' + r.correct + '</td><td class="' + (r.actionCorrect ? 'pos' : 'neg') + '">' + r.action + (r.size ? '×' + r.size : '') + '</td><td class="' + (r.truePnl >= 0 ? 'pos' : 'neg') + '">' + fmt(r.truePnl) + '</td><td class="' + (r.pnlCorrect ? 'pos' : 'neg') + '">' + (r.pnlCorrect ? '✓' : '✗') + '</td></tr>').join('') +
+      '</section><section class="card"><h3>Round log</h3><div class="tbl-wrap"><table class="tbl"><tr><th>#</th><th>cards</th><th>sum</th><th>fair</th><th>quote</th><th>right</th><th>you</th><th>P&L</th><th>calc</th><th>note</th></tr>' +
+      sum.log.map(r => '<tr><td>' + r.round + (r.ruleChanged ? '*' : '') + '</td><td>' + r.cards.join(' ') + '</td><td>' + r.sum + '</td><td>' + r.fair.toFixed(1) + '</td><td>' + r.bid + '/' + r.ask + '</td><td>' + r.correct + '</td><td class="' + (r.actionCorrect ? 'pos' : 'neg') + '">' + r.action + (r.size ? '×' + r.size : '') + '</td><td class="' + (r.truePnl >= 0 ? 'pos' : 'neg') + '">' + fmt(r.truePnl) + '</td><td class="' + (r.pnlCorrect ? 'pos' : 'neg') + '">' + (r.pnlCorrect ? '✓' : '✗') + '</td><td class="' + (r.noteNum == null || r.round === 1 ? '' : (r.noteOk ? 'pos' : 'neg')) + '">' + (r.noteNum == null || r.round === 1 ? '' : r.noteNum + (r.noteOk ? '' : ' (' + fmt(r.pnlBefore) + ')')) + '</td></tr>').join('') +
       '</table></div></section>';
     showScreen('results');
   }
@@ -279,6 +296,11 @@
   /* ---------- boot ---------- */
   wireSettings(); syncSettingsUI();
   el('btn-start').onclick = startGame;
+  el('btn-interview').onclick = () => {
+    const on = Store.isInterviewMode(settings);
+    Object.keys(Store.INTERVIEW).forEach(k => { settings[k] = on ? Store.DEFAULTS[k] : Store.INTERVIEW[k]; });
+    Store.saveSettings(settings); syncSettingsUI(); refreshHome();
+  };
   el('btn-again').onclick = startGame;
   el('btn-home').onclick = () => showScreen('home');
   el('btn-quit').onclick = () => { if (confirm('Quit this game? It will not be saved.')) { stopTimer(); if (flashHandle) clearTimeout(flashHandle); showScreen('home'); } };

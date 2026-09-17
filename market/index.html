@@ -35,6 +35,10 @@
     <p class="best-line" id="best-line"></p>
 
     <section class="settings-panel">
+      <button class="preset-btn" id="btn-interview">
+        <span class="preset-title">Interview mode</span>
+        <span class="preset-desc">Bankroll hidden, notes box, no feedback until the end, 2s of cards, 15s a decision, subtle mispricing, ace rule switches mid-game</span>
+      </button>
       <h2>Game</h2>
       <div class="setting-row"><label>Ace counts as</label>
         <div class="seg" data-key="aceHigh"><button data-val="false">1 (low)</button><button data-val="true">14 (high)</button></div></div>
@@ -56,6 +60,9 @@
         <div class="seg" data-key="timerSec"><button data-val="0">off</button><button data-val="15">15s</button><button data-val="30">30s</button></div></div>
 
       <h2>Twists &amp; aids</h2>
+      <label class="toggle-row"><span>Hide my bankroll and running P&amp;L <small>you carry the total yourself and state it at the end, within 10%</small></span><input type="checkbox" data-key="hideBankroll"></label>
+      <label class="toggle-row"><span>Notes box during the game <small>your paper in the room &mdash; the last number you write is checked as your running P&amp;L each round</small></span><input type="checkbox" data-key="scratchpad"></label>
+      <label class="toggle-row"><span>Feedback after each round <small>off = nothing is revealed until the game ends</small></span><input type="checkbox" data-key="roundFeedback"></label>
       <label class="toggle-row"><span>Ask my fair value before showing the quote <small>measures whether you track the deck</small></span><input type="checkbox" data-key="askFair"></label>
       <label class="toggle-row"><span>Switch the ace rule mid-game <small>the interviewer's twist: 1 &harr; 14 halfway through</small></span><input type="checkbox" data-key="aceSwitch"></label>
       <label class="toggle-row"><span>Show remaining-deck stats after each round <small>training wheels &mdash; turn off before the real thing</small></span><input type="checkbox" data-key="showCount"></label>
@@ -70,6 +77,10 @@
       <span id="g-timer" class="timer"></span>
     </div>
     <div id="g-banner" class="banner" hidden></div>
+    <div class="scratch" id="g-scratch">
+      <label for="g-note">notes</label>
+      <textarea id="g-note" rows="2" autocomplete="off" placeholder="count, fair, running P&amp;L - the last number is read as your total"></textarea>
+    </div>
     <div class="cards" id="g-cards"></div>
     <div id="g-panel" class="panel"></div>
     <button class="quit" id="btn-quit">quit</button>

@@ -84,8 +84,27 @@ const Game = (function () {
     return st.current;
   }
 
-  function act(st, action, size, fairEst, decisionMs, timedOut) {
+  /* Close enough for a running total carried in your head: a 10% band, with a floor of 2 so a
+   * total near zero is not held to the unit. Either the P&L or the bankroll is accepted. */
+  function within(stated, pnl, bankroll, tol) {
+    const ok = (x, truth) => Math.abs(x - truth) <= Math.max(Math.abs(truth) * (tol || 0), 2);
+    return ok(stated, pnl) || ok(stated, bankroll);
+  }
+  /* Last number written in the notes, ignoring the euro sign, commas and any words around it. */
+  function parseNote(s) {
+    if (s == null) return null;
+    const m = String(s).replace(/[\u20ac,]/g, '').match(/-?\d+(?:\.\d+)?/g);
+    return m ? parseFloat(m[m.length - 1]) : null;
+  }
+
+  function act(st, action, size, fairEst, decisionMs, timedOut, note) {
     const c = st.current;
+    /* The note is read at the moment you commit to a trade, so it should hold the running
+     * total BEFORE this round settles. */
+    c.note = note == null ? null : String(note);
+    c.noteNum = parseNote(note);
+    c.pnlBefore = st.bankroll - st.settings.bankroll;
+    c.noteOk = c.noteNum == null ? null : within(c.noteNum, c.pnlBefore, st.bankroll, st.settings.pnlTolerance);
     c.action = action; c.size = action === 'pass' ? 0 : size;
     c.fairEst = fairEst; c.decisionMs = decisionMs; c.timedOut = !!timedOut;
     if (action === 'buy') { c.truePnl = (c.sum - c.ask) * c.size; c.expPnl = (c.fair - c.ask) * c.size; }
@@ -106,6 +125,11 @@ const Game = (function () {
     st.log.push(c);
     if (st.bankroll <= 0 || st.round >= st.settings.rounds || st.deck.length < st.settings.cards) st.over = true;
     return c;
+  }
+
+  function submitFinal(st, stated) {
+    st.finalStated = stated;
+    st.finalOk = Number.isFinite(stated) && within(stated, st.bankroll - st.settings.bankroll, st.bankroll, st.settings.pnlTolerance);
   }
 
   function pearson(xs, ys) {
@@ -139,15 +163,20 @@ const Game = (function () {
       driftMax: L.length ? Math.max.apply(null, L.map(r => Math.abs(r.fair - baseline))) : 0,
       sizeEdgeCorr: pearson(goodTrades.map(r => r.edge), goodTrades.map(r => r.size)),
       tradesTaken: trades.length,
+      finalStated: st.finalStated == null ? null : st.finalStated, finalOk: st.finalOk == null ? null : st.finalOk,
+      notedRounds: L.filter(r => r.round > 1 && r.noteNum != null).length,
+      notesAccurate: L.filter(r => r.round > 1 && r.noteNum != null && r.noteOk).length,
+      noteFirstDrift: (L.find(r => r.round > 1 && r.noteNum != null && !r.noteOk) || {}).round || null,
       log: L.map(r => ({
         round: r.round, cards: r.cards.map(c => c.label), sum: r.sum, fair: +r.fair.toFixed(2),
         bid: r.bid, ask: r.ask, correct: r.correct, edge: +r.edge.toFixed(2), action: r.action, size: r.size,
         fairEst: r.fairEst, decisionMs: r.decisionMs, timedOut: r.timedOut, truePnl: r.truePnl, expPnl: +r.expPnl.toFixed(2),
         enteredPnl: r.enteredPnl, pnlCorrect: r.pnlCorrect, actionCorrect: r.actionCorrect, aceHigh: r.aceHigh,
         ruleChanged: r.ruleChanged, suggestedSize: r.suggestedSize,
+        noteNum: r.noteNum, noteOk: r.noteOk, pnlBefore: r.pnlBefore,
       })),
     };
   }
 
-  return { newGame, deal, act, submitPnl, summary, deckStats, cardValue };
+  return { newGame, deal, act, submitPnl, submitFinal, summary, deckStats, cardValue, parseNote };
 })();

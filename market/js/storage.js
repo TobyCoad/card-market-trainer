@@ -16,7 +16,16 @@ const Store = (function () {
     timerSec: 0,             // decision timer, 0 = off
     showCount: false,        // training aid: show remaining-deck stats after each round
     bankroll: 1000,
+    hideBankroll: true,      // no bankroll or running P&L on screen: you carry it
+    scratchpad: true,        // a notes box during the game; the last number in it is checked as your running P&L
+    roundFeedback: true,     // false = nothing is revealed until the game ends
+    pnlTolerance: 0.10,      // band for the running total in your notes and for the final stated P&L
   };
+
+  /* The room, as reported: nothing on screen but the quote, two seconds of cards, no feedback until the end. */
+  const INTERVIEW = { hideBankroll: true, scratchpad: true, roundFeedback: false, showCount: false, askFair: false,
+                      flashMs: 2000, timerSec: 15, mispriceSd: 1.5, aceSwitch: true, rounds: 12, cards: 3 };
+  const isInterviewMode = s => Object.keys(INTERVIEW).every(k => s[k] === INTERVIEW[k]);
 
   function loadSettings() {
     try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(KEY_SETTINGS) || '{}')); }
@@ -49,5 +58,5 @@ const Store = (function () {
   }
   function reset() { localStorage.removeItem(KEY_GAMES); }
 
-  return { DEFAULTS, loadSettings, saveSettings, loadGames, saveGame, exportJSON, importJSON, reset };
+  return { INTERVIEW, isInterviewMode, DEFAULTS, loadSettings, saveSettings, loadGames, saveGame, exportJSON, importJSON, reset };
 })();
